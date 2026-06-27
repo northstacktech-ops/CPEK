@@ -28,15 +28,15 @@ const empresas = ref([
 ])
 
 const membros = ref([
-  { id: '1', nome: 'Eric Fonseca', email: 'northstacktech@gmail.com', papel: 'Admin', status: 'Ativo' },
+  { id: '1', nome: 'Rafael Mendonça', email: 'rafael@supervisao.com.br', papel: 'Admin', status: 'Ativo' },
   { id: '2', nome: 'Marcos Silva', email: 'marcos@supervisao.com', papel: 'Membro', status: 'Ativo' },
 ])
 
 const auditoria = ref([
-  { id: '1', data: '26/06/2026 14:32', autor: 'Eric Fonseca', acao: 'CREATE', entidade: 'Entrada', detalhe: 'Cautelar · Marcos Andrade · R$ 320,00' },
-  { id: '2', data: '26/06/2026 13:10', autor: 'Eric Fonseca', acao: 'UPDATE', entidade: 'Contato', detalhe: 'Status → Inativo · Juliana Costa' },
+  { id: '1', data: '26/06/2026 14:32', autor: 'Rafael Mendonça', acao: 'CREATE', entidade: 'Entrada', detalhe: 'Cautelar · Marcos Andrade · R$ 320,00' },
+  { id: '2', data: '26/06/2026 13:10', autor: 'Rafael Mendonça', acao: 'UPDATE', entidade: 'Contato', detalhe: 'Status → Inativo · Juliana Costa' },
   { id: '3', data: '25/06/2026 18:00', autor: 'Marcos Silva', acao: 'CREATE', entidade: 'Saída', detalhe: 'Folha de Pagamento · R$ 8.500,00' },
-  { id: '4', data: '25/06/2026 11:45', autor: 'Eric Fonseca', acao: 'DELETE', entidade: 'Fechamento', detalhe: 'Ana Lima · R$ 960,00' },
+  { id: '4', data: '25/06/2026 11:45', autor: 'Rafael Mendonça', acao: 'DELETE', entidade: 'Fechamento', detalhe: 'Ana Lima · R$ 960,00' },
   { id: '5', data: '24/06/2026 09:20', autor: 'Marcos Silva', acao: 'LOGIN', entidade: 'Sessão', detalhe: 'Acesso via email/senha' },
 ])
 

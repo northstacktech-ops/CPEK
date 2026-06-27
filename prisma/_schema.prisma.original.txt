@@ -1,0 +1,401 @@
+// ============================================================================
+// CPEK — Prisma schema (build-ready)
+// Multi-tenant financial SaaS · PostgreSQL/Supabase · RLS por tenant_id
+// Convenção: tenant_id == account.id em TODA tabela de negócio.
+// As policies de RLS vivem em prisma/rls/policies.sql (não são geradas pelo Prisma).
+// ============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL") // pooler Supavisor (:6543, pgbouncer=true) — runtime
+  directUrl = env("DIRECT_URL")   // conexão direta (:5432) — migrations
+}
+
+// ───────────────────────────── Enums ─────────────────────────────
+enum Role {
+  ADMIN
+  MEMBER
+}
+
+enum EntryKind {
+  ENTRY // entrada
+  EXIT // saída
+  CLOSING // fechamento (boleto/fatura consolidada)
+}
+
+enum PeriodStatus {
+  OPEN
+  CLOSED
+}
+
+enum ContactType {
+  CLIENT
+  SUPPLIER
+}
+
+enum CostType {
+  FIXED
+  VARIABLE
+}
+
+enum FieldType {
+  TEXT
+  NUMBER
+  CURRENCY
+  DATE
+  SELECT
+}
+
+enum CatalogKind {
+  PAYMENT_METHOD // Forma de Pagamento
+  SERVICE // Serviço (Cautelar, Certicar, Constatação)
+  STATUS // Status do lançamento (Pago, Em Aberto...)
+  CATEGORY // Categoria contábil → mapeia para uma linha do DRE
+}
+
+// Linha do DRE gerencial (formato contábil confirmado no Figma)
+enum DreGroup {
+  OPERATING_REVENUE // Receita Operacional
+  OPERATING_COST // Custo Operacional
+  OPERATING_EXPENSE // Despesas Operacionais
+  OTHER_REVENUE // Outras Receitas
+  INVESTING // Atividades de Investimento
+  FINANCING // Atividades de Financiamento
+}
+
+enum FeeType {
+  PERCENTAGE
+  FIXED
+}
+
+// ───────────────────────────── Tenant raiz ─────────────────────────────
+model Account {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String
+  createdAt DateTime @default(now())
+
+  users        User[]
+  companies    Company[]
+  contacts     Contact[]
+  bankAccounts BankAccount[]
+  auditLogs    AuditLog[]
+
+  @@map("account")
+}
+
+// MVP: 1 usuário : 1 conta (tenantId fixo). Para a V2 (mesmo login em vários
+// franqueados), substituir por uma tabela Membership (User↔Account N:N) com
+// papel por conta + seleção de tenant no login. Ver ARCHITECTURE §17.
+model User {
+  id        String   @id @db.Uuid // = auth.users.id do Supabase
+  tenantId  String   @map("tenant_id") @db.Uuid
+  email     String
+  name      String?
+  role      Role     @default(MEMBER)
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  account     Account          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  permissions FormPermission[]
+
+  @@index([tenantId])
+  @@map("app_user")
+}
+
+// Gancho para ACL granular por formulário (D6). MVP usa apenas Role; tabela fica pronta.
+model FormPermission {
+  id       String @id @default(uuid()) @db.Uuid
+  tenantId String @map("tenant_id") @db.Uuid
+  userId   String @db.Uuid
+  resource String // "ENTRY" | "EXIT" | "CLOSING" | "DASHBOARD" | "DRE" | ...
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, resource])
+  @@index([tenantId])
+  @@map("form_permission")
+}
+
+model Company {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  name      String
+  segment   String? // "Vistoria Cautelar", "Securise"...
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  account      Account        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  periods      Period[]
+  customFields CustomField[]
+  catalogs     CatalogValue[]
+  costCenters  CostCenter[]
+  feeProfiles  FeeProfile[]
+  bankAccounts BankAccount[]
+  entries      Entry[]
+  exits        Exit[]
+  closings     Closing[]
+
+  @@index([tenantId])
+  @@map("company")
+}
+
+// ───────────────────────────── Cadastros / lookups ─────────────────────────────
+model CatalogValue {
+  id        String      @id @default(uuid()) @db.Uuid
+  tenantId  String      @map("tenant_id") @db.Uuid
+  companyId String      @map("company_id") @db.Uuid
+  kind      CatalogKind
+  label     String
+  order     Int         @default(0)
+  active    Boolean     @default(true)
+
+  // Apenas para kind = CATEGORY: a qual linha do DRE esta categoria pertence.
+  dreGroup DreGroup? @map("dre_group")
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, companyId, kind])
+  @@map("catalog_value")
+}
+
+model CostCenter {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  companyId String   @map("company_id") @db.Uuid
+  label     String
+  costType  CostType @map("cost_type")
+  active    Boolean  @default(true)
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, companyId])
+  @@map("cost_center")
+}
+
+// Taxas e Juros (cadastro confirmado no Figma) — perfil reutilizável em lançamentos.
+model FeeProfile {
+  id        String  @id @default(uuid()) @db.Uuid
+  tenantId  String  @map("tenant_id") @db.Uuid
+  companyId String  @map("company_id") @db.Uuid
+  label     String
+  feeType   FeeType @map("fee_type")
+  value     Decimal @db.Decimal(14, 4) // % (ex 2.5000) ou valor fixo
+  active    Boolean @default(true)
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, companyId])
+  @@map("fee_profile")
+}
+
+// Conta bancária ("Contas" — confirmado no MVP pelo Figma: filtro no DRE + saldo consolidado)
+model BankAccount {
+  id             String   @id @default(uuid()) @db.Uuid
+  tenantId       String   @map("tenant_id") @db.Uuid
+  companyId      String   @map("company_id") @db.Uuid
+  name           String // "Boleto Itaú", "Caixa Loja Principal"...
+  openingBalance Decimal  @default(0) @map("opening_balance") @db.Decimal(14, 2)
+  active         Boolean  @default(true)
+  createdAt      DateTime @default(now())
+
+  account Account   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  company Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  entries Entry[]
+  exits   Exit[]
+  closings Closing[]
+
+  @@index([tenantId, companyId])
+  @@map("bank_account")
+}
+
+// ───────────────────────────── Contatos ─────────────────────────────
+model Contact {
+  id        String      @id @default(uuid()) @db.Uuid
+  tenantId  String      @map("tenant_id") @db.Uuid
+  companyId String?     @map("company_id") @db.Uuid
+  type      ContactType
+  name      String
+  address   String?
+  phone     String?
+  email     String?
+  taxId     String?     @map("cnpj_cpf")
+  contact   String? // nome da pessoa de contato
+  notes     String?
+  active    Boolean     @default(true)
+  createdAt DateTime    @default(now())
+
+  account Account @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, companyId, type])
+  @@map("contact")
+}
+
+// ───────────────────────────── Campos custom ─────────────────────────────
+// fieldKey é estável; label/dataType são editáveis e a edição PROPAGA ao histórico
+// (resolvido na leitura: snapshots guardam fieldKey+value+cache; reports preferem a definição viva).
+model CustomField {
+  id        String    @id @default(uuid()) @db.Uuid
+  tenantId  String    @map("tenant_id") @db.Uuid
+  companyId String    @map("company_id") @db.Uuid
+  kind      EntryKind // a qual formulário pertence (ENTRY/EXIT/CLOSING)
+  fieldKey  String    @map("field_key")
+  label     String
+  dataType  FieldType @map("data_type")
+  required  Boolean   @default(false)
+  options   Json? // para SELECT
+  order     Int       @default(0)
+  active    Boolean   @default(true)
+  createdAt DateTime  @default(now())
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, kind, fieldKey])
+  @@index([tenantId])
+  @@map("custom_field")
+}
+
+// ───────────────────────────── Período ─────────────────────────────
+model Period {
+  id         String       @id @default(uuid()) @db.Uuid
+  tenantId   String       @map("tenant_id") @db.Uuid
+  companyId  String       @map("company_id") @db.Uuid
+  month      Int // 1..12
+  year       Int
+  status     PeriodStatus @default(OPEN)
+  closedAt   DateTime?    @map("closed_at")
+  closedById String?      @map("closed_by_id") @db.Uuid
+
+  company  Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  entries  Entry[]
+  exits    Exit[]
+  closings Closing[]
+
+  @@unique([companyId, year, month])
+  @@index([tenantId])
+  @@map("period")
+}
+
+// ───────────────────────────── Lançamentos ─────────────────────────────
+// Campos FIXOS = colunas (núcleo financeiro genérico).
+// Campos da operação (Placa, Modelo, Deslocamento...) entram como CustomField por empresa
+// e são gravados em customSnapshot. Isso reconcilia o spec FCS com o modal genérico do Figma.
+
+model Entry {
+  id            String  @id @default(uuid()) @db.Uuid
+  tenantId      String  @map("tenant_id") @db.Uuid
+  companyId     String  @map("company_id") @db.Uuid
+  periodId      String  @map("period_id") @db.Uuid
+  bankAccountId String? @map("bank_account_id") @db.Uuid
+  contactId     String? @map("contact_id") @db.Uuid // Cliente
+  serviceId     String? @map("service_id") @db.Uuid // CatalogValue(SERVICE) → breakdown do DRE
+  categoryId    String? @map("category_id") @db.Uuid // CatalogValue(CATEGORY) → linha do DRE
+  paymentId     String? @map("payment_id") @db.Uuid
+  statusId      String? @map("status_id") @db.Uuid
+  feeProfileId  String? @map("fee_profile_id") @db.Uuid
+
+  valorServico  Decimal   @map("valor_servico") @db.Decimal(14, 2)
+  deslocamento  Decimal   @default(0) @db.Decimal(14, 2)
+  placa         String?
+  modelo        String?
+  dataServico   DateTime? @map("data_servico")
+  dataPagamento DateTime? @map("data_pagamento") // != null → realizado
+  documentoNf   String?   @map("documento_nf")
+  anotacoes     String?
+
+  customSnapshot Json?    @map("custom_snapshot")
+  createdById    String?  @map("created_by_id") @db.Uuid
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  period      Period       @relation(fields: [periodId], references: [id], onDelete: Cascade)
+  company     Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  bankAccount BankAccount? @relation(fields: [bankAccountId], references: [id])
+
+  @@index([tenantId, companyId, periodId])
+  @@index([tenantId, companyId, categoryId])
+  @@map("entry")
+}
+
+model Exit {
+  id            String  @id @default(uuid()) @db.Uuid
+  tenantId      String  @map("tenant_id") @db.Uuid
+  companyId     String  @map("company_id") @db.Uuid
+  periodId      String  @map("period_id") @db.Uuid
+  bankAccountId String? @map("bank_account_id") @db.Uuid
+  contactId     String? @map("contact_id") @db.Uuid // Fornecedor
+  costCenterId  String? @map("cost_center_id") @db.Uuid
+  categoryId    String? @map("category_id") @db.Uuid
+  paymentId     String? @map("payment_id") @db.Uuid
+
+  valorDespesa   Decimal   @map("valor_despesa") @db.Decimal(14, 2)
+  descricao      String?
+  dataLancamento DateTime? @map("data_lancamento")
+  dataVencimento DateTime? @map("data_vencimento")
+  dataPagamento  DateTime? @map("data_pagamento") // != null → realizado
+  documentoNf    String?   @map("documento_nf")
+  anotacoes      String?
+
+  customSnapshot Json?    @map("custom_snapshot")
+  createdById    String?  @map("created_by_id") @db.Uuid
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  period      Period       @relation(fields: [periodId], references: [id], onDelete: Cascade)
+  company     Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  bankAccount BankAccount? @relation(fields: [bankAccountId], references: [id])
+
+  @@index([tenantId, companyId, periodId])
+  @@index([tenantId, companyId, categoryId])
+  @@map("exit")
+}
+
+model Closing {
+  id            String  @id @default(uuid()) @db.Uuid
+  tenantId      String  @map("tenant_id") @db.Uuid
+  companyId     String  @map("company_id") @db.Uuid
+  periodId      String  @map("period_id") @db.Uuid
+  bankAccountId String? @map("bank_account_id") @db.Uuid
+  contactId     String? @map("contact_id") @db.Uuid // Cliente
+  categoryId    String? @map("category_id") @db.Uuid
+  statusId      String? @map("status_id") @db.Uuid
+
+  valorFechamento Decimal   @map("valor_fechamento") @db.Decimal(14, 2)
+  descricao       String?
+  dataFechamento  DateTime? @map("data_fechamento")
+  dataVencPrev    DateTime? @map("data_venc_prev")
+  dataRecebimento DateTime? @map("data_recebimento") // != null → realizado
+  documentoNf     String?   @map("documento_nf")
+
+  customSnapshot Json?    @map("custom_snapshot")
+  createdById    String?  @map("created_by_id") @db.Uuid
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  period      Period       @relation(fields: [periodId], references: [id], onDelete: Cascade)
+  company     Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  bankAccount BankAccount? @relation(fields: [bankAccountId], references: [id])
+
+  @@index([tenantId, companyId, periodId])
+  @@map("closing")
+}
+
+// ───────────────────────────── Auditoria ─────────────────────────────
+model AuditLog {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  userId    String?  @map("user_id") @db.Uuid
+  action    String // "PERIOD_CLOSE" | "ENTRY_DELETE" | "CUSTOM_FIELD_EDIT" ...
+  entity    String
+  entityId  String?  @map("entity_id")
+  meta      Json?
+  createdAt DateTime @default(now())
+
+  account Account @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, createdAt])
+  @@map("audit_log")
+}

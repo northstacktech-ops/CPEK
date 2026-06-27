@@ -1,0 +1,84 @@
+name: CI
+
+# Pipeline (ARCHITECTURE §14, README §7): lint → typecheck → test (RLS matriz) → migrate diff.
+# O teste de isolamento RLS em matriz é gate de merge.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: cpek_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DIRECT_URL: postgresql://postgres:postgres@localhost:5432/cpek_test
+      DATABASE_URL: postgresql://cpek_app:cpek_app@localhost:5432/cpek_test
+      CPEK_APP_DB_PASSWORD: cpek_app
+      # Segredos de Supabase não são necessários para lint/typecheck/RLS.
+      SUPABASE_JWT_SECRET: test-secret
+      SUPABASE_URL: http://localhost
+      SUPABASE_ANON_KEY: test-anon
+      SUPABASE_SERVICE_ROLE_KEY: test-service
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Prisma generate
+        run: pnpm prisma generate
+
+      - name: Lint (inclui regra no-base-prisma-in-api §4.3)
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Apply migrations (test DB)
+        run: pnpm prisma migrate deploy
+
+      - name: Apply RLS policies
+        run: |
+          PGPASSWORD=postgres psql "$DIRECT_URL" \
+            -v cpek_app_password="'$CPEK_APP_DB_PASSWORD'" \
+            -f prisma/rls/policies.sql
+
+      - name: Test (unit + RLS matriz)
+        run: pnpm test
+
+      - name: Migrate diff (schema ↔ migrations em sincronia)
+        run: |
+          pnpm prisma migrate diff \
+            --from-migrations prisma/migrations \
+            --to-schema-datamodel prisma/schema.prisma \
+            --exit-code || (echo "::error::schema.prisma diverge das migrations" && exit 1)

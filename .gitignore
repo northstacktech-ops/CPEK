@@ -1,0 +1,28 @@
+# Nuxt / Nitro
+.nuxt
+.output
+.data
+dist
+
+# deps
+node_modules
+.pnpm-store
+
+# env & secrets
+.env
+.env.local
+.env.*.local
+
+# prisma
+prisma/*.db
+
+# test artifacts
+coverage
+playwright-report
+test-results
+
+# editor / OS
+.DS_Store
+*.log
+.vscode
+.idea

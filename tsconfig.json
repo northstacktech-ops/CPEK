@@ -1,0 +1,17 @@
+{
+  // Estende o tsconfig gerado pelo Nuxt (.nuxt/tsconfig.json após `nuxt prepare`).
+  "extends": "./.nuxt/tsconfig.json",
+  "compilerOptions": {
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "forceConsistentCasingInFileNames": true,
+    "types": ["node", "vitest/globals"]
+  },
+  "include": [
+    "**/*.ts",
+    "**/*.tsx",
+    "**/*.vue",
+    "eslint-rules/**/*.js"
+  ],
+  "exclude": ["node_modules", ".nuxt", "dist", ".output"]
+}

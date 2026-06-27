@@ -1,0 +1,56 @@
+{
+  "$comment": "Template de franquia Supervisão (vistoria cautelar). ARCHITECTURE §13. Aplicado idempotentemente ao criar uma Company. Para a 2ª empresa (Securise/Semijoias — D pendente §19), duplicar este arquivo com outro template.",
+  "templateKey": "supervisao",
+  "companyName": "Supervisão",
+  "segment": "Vistoria Cautelar",
+  "catalogs": {
+    "SERVICE": [
+      { "label": "Cautelar", "order": 1 },
+      { "label": "Certicar", "order": 2 },
+      { "label": "Constatação", "order": 3 }
+    ],
+    "STATUS": [
+      { "label": "Em Aberto", "order": 1 },
+      { "label": "Pago", "order": 2 },
+      { "label": "Vencido", "order": 3 },
+      { "label": "Cancelado", "order": 4 }
+    ],
+    "PAYMENT_METHOD": [
+      { "label": "Dinheiro", "order": 1 },
+      { "label": "PIX", "order": 2 },
+      { "label": "Cartão de Crédito", "order": 3 },
+      { "label": "Cartão de Débito", "order": 4 },
+      { "label": "Boleto", "order": 5 },
+      { "label": "Transferência", "order": 6 }
+    ],
+    "CATEGORY": [
+      { "label": "Receita de Serviços", "order": 1, "dreGroup": "OPERATING_REVENUE" },
+      { "label": "Deslocamento (Receita)", "order": 2, "dreGroup": "OPERATING_REVENUE" },
+      { "label": "Combustível", "order": 3, "dreGroup": "OPERATING_COST" },
+      { "label": "Manutenção de Veículo", "order": 4, "dreGroup": "OPERATING_COST" },
+      { "label": "Terceirização de Vistoria", "order": 5, "dreGroup": "OPERATING_COST" },
+      { "label": "Salários e Encargos", "order": 6, "dreGroup": "OPERATING_EXPENSE" },
+      { "label": "Aluguel", "order": 7, "dreGroup": "OPERATING_EXPENSE" },
+      { "label": "Marketing", "order": 8, "dreGroup": "OPERATING_EXPENSE" },
+      { "label": "Software / Sistemas", "order": 9, "dreGroup": "OPERATING_EXPENSE" },
+      { "label": "Tarifas Bancárias", "order": 10, "dreGroup": "OPERATING_EXPENSE" },
+      { "label": "Outras Receitas", "order": 11, "dreGroup": "OTHER_REVENUE" },
+      { "label": "Compra de Equipamento", "order": 12, "dreGroup": "INVESTING" },
+      { "label": "Empréstimo / Financiamento", "order": 13, "dreGroup": "FINANCING" },
+      { "label": "Aporte / Retirada de Sócios", "order": 14, "dreGroup": "FINANCING" }
+    ]
+  },
+  "costCenters": [
+    { "label": "Administrativo", "costType": "FIXED" },
+    { "label": "Operacional", "costType": "VARIABLE" },
+    { "label": "Comercial", "costType": "VARIABLE" },
+    { "label": "Frota", "costType": "VARIABLE" }
+  ],
+  "customFields": {
+    "ENTRY": [
+      { "fieldKey": "placa", "label": "Placa", "dataType": "TEXT", "required": false, "order": 1 },
+      { "fieldKey": "modelo", "label": "Modelo", "dataType": "TEXT", "required": false, "order": 2 },
+      { "fieldKey": "renavam", "label": "RENAVAM", "dataType": "TEXT", "required": false, "order": 3 }
+    ]
+  }
+}

@@ -6,7 +6,7 @@ import PageContent from '../../components/layout/PageContent.vue'
 
 const sections = [
   { label: 'Categorias', icon: 'pi pi-tag', desc: 'Grupos de DRE para cada despesa e receita', count: 8, route: '/cadastros/categorias' },
-  { label: 'Serviços', icon: 'pi pi-briefcase', desc: 'Cautelar, Certicar e Constatação', count: 3, route: '/cadastros/servicos' },
+  { label: 'Serviços', icon: 'pi pi-briefcase', desc: 'Cautelar, Certicar e Constatação', count: 3, route: '/cadastros/serviços' },
   { label: 'Status', icon: 'pi pi-circle', desc: 'Em Aberto, Pago, Vencido, Cancelado', count: 4, route: '/cadastros/status' },
   { label: 'Formas de Pgto.', icon: 'pi pi-credit-card', desc: 'Dinheiro, PIX, Cartão, Boleto', count: 5, route: '/cadastros/formas-pagamento' },
   { label: 'Centros de Custo', icon: 'pi pi-objects-column', desc: 'Fixo e Variável', count: 2, route: '/cadastros/centros-custo' },

@@ -5,6 +5,7 @@ import Aura from '@primeuix/themes/aura'
 export default defineNuxtConfig({
   compatibilityDate: '2024-11-01',
   devtools: { enabled: true },
+  pages: true,
 
   modules: ['@pinia/nuxt', '@primevue/nuxt-module', '@nuxtjs/tailwindcss'],
 
@@ -44,6 +45,20 @@ export default defineNuxtConfig({
 
   nitro: {
     moduleSideEffects: ['@prisma/client'],
+    externals: {
+      external: ['@prisma/client', '.prisma/client', 'prisma'],
+    },
+    compressPublicAssets: true,
+  },
+
+  routeRules: {
+    '/login': { ssr: true },
+    '/api/health': { headers: { 'cache-control': 'no-store' } },
+    '/api/**': { headers: { 'cache-control': 'private, no-store' } },
+  },
+
+  build: {
+    analyze: process.env.ANALYZE === 'true',
   },
 
   app: {
@@ -51,6 +66,10 @@ export default defineNuxtConfig({
       title: 'CPEK',
       htmlAttrs: { lang: 'pt-BR' },
       meta: [{ name: 'viewport', content: 'width=device-width, initial-scale=1' }],
+      link: [
+        { rel: 'preconnect', href: 'https://fonts.googleapis.com' },
+        { rel: 'preconnect', href: 'https://fonts.gstatic.com', crossorigin: '' },
+      ],
     },
   },
 })

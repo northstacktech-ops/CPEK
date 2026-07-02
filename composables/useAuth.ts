@@ -9,6 +9,7 @@ import { useSessionStore } from '../stores/session'
 let _client: SupabaseClient | null = null
 const DEMO_ACCESS_TOKEN = 'demo-access-token'
 const DEMO_TENANT_ID = '00000000-0000-0000-0000-000000000001'
+const DEMO_STORAGE_KEY = 'cpek.demo.session'
 
 export function useSupabase(): SupabaseClient {
   if (_client) return _client
@@ -33,8 +34,14 @@ export function useAuth() {
         accessToken: token,
         tenantId: meta.account_id,
       })
+
+      const me = await $fetch<{
+        companies: Array<{ id: string; name: string; segment?: string | null }>
+      }>('/api/me', {
+        headers: { authorization: `Bearer ${token}` },
+      })
+      company.setCompanies(me.companies)
     }
-    // TODO(§9): redirecionamento por papel.
   }
 
   async function signOut() {
@@ -44,6 +51,7 @@ export function useAuth() {
     session.clear()
     company.clear()
     period.reset()
+    if (import.meta.client) localStorage.removeItem(DEMO_STORAGE_KEY)
     await navigateTo('/login')
   }
 
@@ -72,6 +80,16 @@ export function useAuth() {
     ])
     company.setActive('00000000-0000-0000-0000-000000000201')
     period.set(6, 2026)
+    if (import.meta.client) {
+      localStorage.setItem(
+        DEMO_STORAGE_KEY,
+        JSON.stringify({
+          activeCompanyId: company.activeId,
+          month: period.month,
+          year: period.year,
+        }),
+      )
+    }
   }
 
   return { signIn, signInDemo, signOut }

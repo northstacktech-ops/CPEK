@@ -1,15 +1,79 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
-import { navigateTo } from '#imports'
+import { computed, onMounted, ref, watch } from 'vue'
 import AppBreadcrumb from '../../components/layout/AppBreadcrumb.vue'
 import PageHeader from '../../components/layout/PageHeader.vue'
 import PageContent from '../../components/layout/PageContent.vue'
+import { useCompanyStore } from '../../stores/company'
+import { usePeriodStore } from '../../stores/period'
+
+interface CatalogOption {
+  id: string
+  label: string
+  active?: boolean
+}
+
+interface ContactOption {
+  id: string
+  name: string
+  active?: boolean
+}
+
+interface AccountOption {
+  id?: string
+  bankAccountId?: string
+  name: string
+}
+
+interface EntryRecord {
+  id: string
+  data?: string
+  cliente?: string
+  servico?: string
+  status?: string
+  valor?: number | string
+  valorServico?: number | string
+  deslocamento?: number | string
+  dataServico?: string | null
+  dataPagamento?: string | null
+  bankAccountId?: string | null
+  contactId?: string | null
+  serviceId?: string | null
+  categoryId?: string | null
+  statusId?: string | null
+  feeProfileId?: string | null
+  anotacoes?: string | null
+}
+
+interface EntryRow {
+  id: string
+  data: string
+  cliente: string
+  servico: string
+  valor: number
+  deslocamento: number
+  status: string
+  raw: EntryRecord
+}
+
+const company = useCompanyStore()
+const period = usePeriodStore()
+const { api } = useApi()
+const { ensure } = usePeriod()
 
 const loading = ref(false)
+const saving = ref(false)
+const error = ref<string | null>(null)
 const search = ref('')
 const statusFilter = ref<string | null>(null)
 const drawerOpen = ref(false)
 const editingId = ref<string | null>(null)
+
+const services = ref<CatalogOption[]>([])
+const categories = ref<CatalogOption[]>([])
+const statuses = ref<CatalogOption[]>([])
+const accounts = ref<AccountOption[]>([])
+const clients = ref<ContactOption[]>([])
+const entries = ref<EntryRow[]>([])
 
 const form = ref({
   valor: null as number | null,
@@ -19,120 +83,243 @@ const form = ref({
   categoria: null as string | null,
   conta: null as string | null,
   dataCompetencia: new Date() as Date | null,
-  dataVencimento: new Date() as Date | null,
   cliente: null as string | null,
-  centroCusto: null as string | null,
   taxa: null as string | null,
   servico: null as string | null,
   deslocamento: null as number | null,
   status: 'Em Aberto',
-  data: null as Date | null,
-  recorrente: false,
-  recorrenciaFreq: 'Mensal' as string,
-  recorrenciaQtd: '12 meses' as string,
 })
 
-const activeModalTab = ref(0)
-const modalTabs = ['Dados do Lançamento', 'Recorrência', 'Adicionais', 'Documentos']
-
-const statusOptions = ['Em Aberto', 'Pago', 'Vencido', 'Cancelado']
-const servicoOptions = ['Cautelar', 'Certicar', 'Constatação']
-const categoriaOptions = ['Receita de Serviços', 'Receita de Vistorias', 'Outras Receitas']
-const contaOptions = ['Boleto Itaú', 'Caixa Loja', 'Cartão Créd./Déb.', 'Conta Cortesia']
-const clienteOptions = ['Marcos Andrade', 'Imobiliária ABC', 'Ana Lima', 'Posto Shell', 'Roberto Souza', 'Juliana Costa']
-const centroCustoOptions = ['Fixo', 'Variável']
-const taxaOptions = ['Padrão Boleto', 'Tolerância 5 dias']
+const fallbackStatusOptions = ['Em Aberto', 'Pago', 'Vencido', 'Cancelado']
+const statusOptions = computed(() => unique([...statuses.value.map((item) => item.label), ...fallbackStatusOptions]))
+const servicoOptions = computed(() => services.value.map((item) => item.label))
+const categoriaOptions = computed(() => categories.value.map((item) => item.label))
+const contaOptions = computed(() => accounts.value.map((item) => item.name))
+const clienteOptions = computed(() => clients.value.map((item) => item.name))
 
 const statusSeverity: Record<string, string> = {
-  'Pago': 'success',
+  Pago: 'success',
+  Recebido: 'success',
   'Em Aberto': 'info',
-  'Vencido': 'danger',
-  'Cancelado': 'secondary',
+  Vencido: 'danger',
+  Cancelado: 'secondary',
 }
-
-const entries = ref([
-  { id: '1', data: '10/06/2026', cliente: 'Marcos Andrade', servico: 'Cautelar', valor: 320, deslocamento: 45, status: 'Pago' },
-  { id: '2', data: '11/06/2026', cliente: 'Ana Lima', servico: 'Certicar', valor: 480, deslocamento: 60, status: 'Pago' },
-  { id: '3', data: '12/06/2026', cliente: 'Roberto Souza', servico: 'Constatação', valor: 280, deslocamento: 30, status: 'Em Aberto' },
-  { id: '4', data: '13/06/2026', cliente: 'Juliana Costa', servico: 'Cautelar', valor: 350, deslocamento: 50, status: 'Vencido' },
-  { id: '5', data: '14/06/2026', cliente: 'Paulo Ferreira', servico: 'Certicar', valor: 520, deslocamento: 80, status: 'Pago' },
-  { id: '6', data: '15/06/2026', cliente: 'Carla Mendes', servico: 'Cautelar', valor: 310, deslocamento: 40, status: 'Em Aberto' },
-  { id: '7', data: '16/06/2026', cliente: 'Fernando Rocha', servico: 'Constatação', valor: 290, deslocamento: 35, status: 'Pago' },
-  { id: '8', data: '17/06/2026', cliente: 'Luciana Alves', servico: 'Certicar', valor: 460, deslocamento: 70, status: 'Cancelado' },
-  { id: '9', data: '18/06/2026', cliente: 'Diego Martins', servico: 'Cautelar', valor: 330, deslocamento: 48, status: 'Pago' },
-  { id: '10', data: '19/06/2026', cliente: 'Silvia Nunes', servico: 'Constatação', valor: 270, deslocamento: 25, status: 'Em Aberto' },
-])
 
 const filtered = computed(() => {
   let result = entries.value
-  if (statusFilter.value) result = result.filter(e => e.status === statusFilter.value)
+  if (statusFilter.value) result = result.filter((entry) => entry.status === statusFilter.value)
   const q = search.value.trim().toLowerCase()
-  if (q) result = result.filter(e => `${e.cliente} ${e.servico} ${e.status}`.toLowerCase().includes(q))
+  if (q) result = result.filter((entry) => `${entry.cliente} ${entry.servico} ${entry.status}`.toLowerCase().includes(q))
   return result
 })
 
-const brl = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
-const fmtDate = (d: Date) => d.toLocaleDateString('pt-BR')
-const today = () => new Date().toLocaleDateString('pt-BR')
+function unique(values: string[]) {
+  return [...new Set(values.filter(Boolean))]
+}
+
+function brl(value: number) {
+  return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+}
+
+function formatDate(value: Date | string | null | undefined) {
+  if (!value) return '-'
+  return new Date(value).toLocaleDateString('pt-BR')
+}
+
+function optionIdByLabel(list: Array<CatalogOption | ContactOption | AccountOption>, label: string | null) {
+  if (!label) return undefined
+  const match = list.find((item) => ('label' in item ? item.label : item.name) === label)
+  if (!match) return undefined
+  return 'bankAccountId' in match ? (match.bankAccountId ?? match.id) : match.id
+}
+
+function labelById(list: Array<CatalogOption | ContactOption | AccountOption>, id: string | null | undefined) {
+  if (!id) return ''
+  const match = list.find((item) => ('bankAccountId' in item ? item.bankAccountId === id || item.id === id : item.id === id))
+  return match ? ('label' in match ? match.label : match.name) : ''
+}
+
+function statusFromEntry(entry: EntryRecord) {
+  if (entry.status) return entry.status
+  if (entry.dataPagamento) return 'Pago'
+  if (entry.dataServico && new Date(entry.dataServico) < new Date()) return 'Vencido'
+  return 'Em Aberto'
+}
+
+function normalizeEntry(entry: EntryRecord): EntryRow {
+  return {
+    id: entry.id,
+    data: entry.data ?? formatDate(entry.dataServico),
+    cliente: (entry.cliente ?? labelById(clients.value, entry.contactId)) || 'Sem cliente',
+    servico: (entry.servico ?? labelById(services.value, entry.serviceId)) || 'Sem serviço',
+    valor: Number(entry.valor ?? entry.valorServico ?? 0),
+    deslocamento: Number(entry.deslocamento ?? 0),
+    status: statusFromEntry(entry),
+    raw: entry,
+  }
+}
+
+async function loadEntries() {
+  if (!company.activeId) return
+  loading.value = true
+  error.value = null
+
+  try {
+    const [currentPeriod, serviceRes, categoryRes, statusRes, accountRes, clientRes] = await Promise.all([
+      ensure(company.activeId),
+      api<{ items: CatalogOption[] }>('/api/catalogs', { query: { companyId: company.activeId, kind: 'SERVICE' } }),
+      api<{ items: CatalogOption[] }>('/api/catalogs', { query: { companyId: company.activeId, kind: 'CATEGORY' } }),
+      api<{ items: CatalogOption[] }>('/api/catalogs', { query: { companyId: company.activeId, kind: 'STATUS' } }),
+      api<{ items: AccountOption[] }>('/api/bank-accounts', { query: { companyId: company.activeId } }),
+      api<{ items: ContactOption[] }>('/api/contacts', { query: { companyId: company.activeId, type: 'CLIENT' } }),
+    ])
+
+    services.value = serviceRes.items
+    categories.value = categoryRes.items
+    statuses.value = statusRes.items
+    accounts.value = accountRes.items
+    clients.value = clientRes.items
+
+    const response = await api<{ items: EntryRecord[] }>('/api/entries', {
+      query: { companyId: company.activeId, periodId: currentPeriod.id },
+    })
+    entries.value = response.items.map(normalizeEntry)
+  } catch {
+    error.value = 'Não foi possível carregar as entradas.'
+  } finally {
+    loading.value = false
+  }
+}
+
+function resetForm() {
+  form.value = {
+    valor: null,
+    jaRecebido: false,
+    dataRecebimento: null,
+    descricao: '',
+    categoria: null,
+    conta: null,
+    dataCompetencia: new Date(),
+    cliente: null,
+    taxa: null,
+    servico: null,
+    deslocamento: null,
+    status: 'Em Aberto',
+  }
+}
 
 function openNew() {
   editingId.value = null
-  form.value = { valor: null, jaRecebido: false, dataRecebimento: null, descricao: '', categoria: null, conta: null, dataCompetencia: new Date(), dataVencimento: new Date(), cliente: null, centroCusto: null, taxa: null, servico: null, deslocamento: null, status: 'Em Aberto', data: null }
-  activeModalTab.value = 0
+  resetForm()
   drawerOpen.value = true
 }
 
-function openEdit(row: typeof entries.value[0]) {
+function openEdit(row: EntryRow) {
   editingId.value = row.id
-  form.value = { valor: row.valor, jaRecebido: false, dataRecebimento: null, descricao: '', categoria: null, conta: null, dataCompetencia: new Date(), dataVencimento: new Date(), cliente: row.cliente, centroCusto: null, taxa: null, servico: row.servico, deslocamento: row.deslocamento, status: row.status, data: null }
-  activeModalTab.value = 0
+  form.value = {
+    valor: row.valor,
+    jaRecebido: Boolean(row.raw.dataPagamento) || row.status === 'Pago',
+    dataRecebimento: row.raw.dataPagamento ? new Date(row.raw.dataPagamento) : null,
+    descricao: row.raw.anotacoes ?? '',
+    categoria: labelById(categories.value, row.raw.categoryId) || null,
+    conta: labelById(accounts.value, row.raw.bankAccountId) || null,
+    dataCompetencia: row.raw.dataServico ? new Date(row.raw.dataServico) : new Date(),
+    cliente: row.cliente === 'Sem cliente' ? null : row.cliente,
+    taxa: null,
+    servico: row.servico === 'Sem serviço' ? null : row.servico,
+    deslocamento: row.deslocamento,
+    status: row.status,
+  }
   drawerOpen.value = true
 }
 
-function saveEntry() {
-  const dataStr = form.value.dataCompetencia ? fmtDate(form.value.dataCompetencia) : today()
-  if (editingId.value) {
-    const idx = entries.value.findIndex(e => e.id === editingId.value)
-    if (idx !== -1) {
-      entries.value[idx] = {
-        ...entries.value[idx],
-        cliente: form.value.cliente ?? '',
-        servico: form.value.servico ?? '',
-        valor: form.value.valor ?? 0,
-        deslocamento: entries.value[idx].deslocamento,
-        status: form.value.status,
-        data: dataStr,
-      }
+async function saveEntry() {
+  if (!company.activeId || saving.value) return
+  saving.value = true
+  error.value = null
+
+  try {
+    const currentPeriod = await ensure(company.activeId)
+    const receivedDate = form.value.jaRecebido || form.value.status === 'Pago'
+      ? (form.value.dataRecebimento ?? new Date())
+      : undefined
+    const body = {
+      bankAccountId: optionIdByLabel(accounts.value, form.value.conta),
+      contactId: optionIdByLabel(clients.value, form.value.cliente),
+      serviceId: optionIdByLabel(services.value, form.value.servico),
+      categoryId: optionIdByLabel(categories.value, form.value.categoria),
+      statusId: optionIdByLabel(statuses.value, form.value.status),
+      valorServico: form.value.valor ?? 0,
+      deslocamento: form.value.deslocamento ?? 0,
+      dataServico: form.value.dataCompetencia?.toISOString(),
+      dataPagamento: receivedDate?.toISOString(),
+      anotacoes: form.value.descricao || undefined,
     }
-  } else {
-    entries.value.unshift({
-      id: String(Date.now()),
-      data: dataStr,
-      cliente: form.value.cliente ?? '',
-      servico: form.value.servico ?? '',
+
+    const response = editingId.value
+      ? await api<{ item: EntryRecord }>(`/api/entries/${editingId.value}`, { method: 'PATCH', body })
+      : await api<{ item: EntryRecord }>('/api/entries', {
+          method: 'POST',
+          body: { ...body, companyId: company.activeId, periodId: currentPeriod.id },
+        })
+
+    const displayRecord: EntryRecord = {
+      ...response.item,
+      id: response.item.id,
+      data: formatDate(form.value.dataCompetencia),
+      cliente: form.value.cliente ?? 'Sem cliente',
+      servico: form.value.servico ?? 'Sem serviço',
       valor: form.value.valor ?? 0,
-      deslocamento: 0,
+      deslocamento: form.value.deslocamento ?? 0,
       status: form.value.status,
-    })
+      dataPagamento: receivedDate?.toISOString() ?? null,
+    }
+    const normalized = normalizeEntry(displayRecord)
+
+    if (editingId.value) {
+      entries.value = entries.value.map((entry) => (entry.id === editingId.value ? normalized : entry))
+    } else {
+      entries.value = [normalized, ...entries.value]
+    }
+    drawerOpen.value = false
+  } catch {
+    error.value = 'Não foi possível salvar a entrada.'
+  } finally {
+    saving.value = false
   }
-  drawerOpen.value = false
 }
 
-function deleteEntry(id: string) {
-  if (!window.confirm('Excluir este lançamento?')) return
-  const idx = entries.value.findIndex(e => e.id === id)
-  if (idx !== -1) entries.value.splice(idx, 1)
+async function deleteEntry(id: string) {
+  if (!window.confirm('Excluir esta entrada?')) return
+  try {
+    await api<{ ok: boolean }>(`/api/entries/${id}`, { method: 'DELETE' })
+    entries.value = entries.value.filter((entry) => entry.id !== id)
+  } catch {
+    error.value = 'Não foi possível excluir a entrada.'
+  }
 }
 
 function exportCSV() {
   const rows = [['Data', 'Cliente', 'Serviço', 'Valor', 'Deslocamento', 'Status']]
-  entries.value.forEach(e => rows.push([e.data, e.cliente, e.servico, String(e.valor), String(e.deslocamento), e.status]))
-  const csv = rows.map(r => r.map(c => `"${c}"`).join(',')).join('\n')
-  const a = document.createElement('a')
-  a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }))
-  a.download = 'entradas.csv'
-  a.click()
+  filtered.value.forEach((entry) => rows.push([entry.data, entry.cliente, entry.servico, String(entry.valor), String(entry.deslocamento), entry.status]))
+  const csv = rows.map((row) => row.map((cell) => `"${cell.replaceAll('"', '""')}"`).join(',')).join('\n')
+  const anchor = document.createElement('a')
+  anchor.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }))
+  anchor.download = 'entradas.csv'
+  anchor.click()
 }
+
+watch(() => company.activeId, () => {
+  void loadEntries()
+})
+
+watch(() => [period.month, period.year], () => {
+  void loadEntries()
+})
+
+onMounted(() => {
+  void loadEntries()
+})
 </script>
 
 <template>
@@ -147,27 +334,30 @@ function exportCSV() {
       </template>
     </PageHeader>
 
-    <!-- Abas de navegação -->
     <div class="mb-4 flex gap-1 border-b border-surface-200 dark:border-surface-800">
-      <NuxtLink to="/lancamentos/entradas" class="border-b-2 px-4 py-2 text-sm font-semibold border-brand-600 text-brand-600">Entradas</NuxtLink>
+      <NuxtLink to="/lancamentos/entradas" class="border-b-2 border-brand-600 px-4 py-2 text-sm font-semibold text-brand-600">Entradas</NuxtLink>
       <NuxtLink to="/lancamentos/saidas" class="border-b-2 border-transparent px-4 py-2 text-sm font-medium text-surface-500 hover:text-surface-800 dark:hover:text-surface-200">Saídas</NuxtLink>
       <NuxtLink to="/lancamentos/fechamentos" class="border-b-2 border-transparent px-4 py-2 text-sm font-medium text-surface-500 hover:text-surface-800 dark:hover:text-surface-200">Fechamentos</NuxtLink>
     </div>
 
     <PageContent>
+      <Message v-if="error" severity="error" size="small" class="col-span-12">{{ error }}</Message>
+
       <div class="col-span-12">
-        <div class="mb-3 flex items-center gap-2">
-          <IconField class="w-64">
+        <div class="mb-3 flex flex-col gap-2 md:flex-row md:items-center">
+          <IconField class="w-full md:w-64">
             <InputIcon class="pi pi-search" />
-            <InputText v-model="search" placeholder="Buscar cliente, serviço..." size="small" />
+            <InputText v-model="search" placeholder="Buscar cliente, serviço..." size="small" fluid />
           </IconField>
-          <Select v-model="statusFilter" :options="statusOptions" placeholder="Status" show-clear size="small" class="w-36" />
+          <Select v-model="statusFilter" :options="statusOptions" placeholder="Status" show-clear size="small" class="w-full md:w-40" />
         </div>
 
+        <TableSkeleton v-if="loading" :rows="6" :columns="7" />
+
         <DataTable
+          v-else
           :value="filtered"
           data-key="id"
-          :loading="loading"
           paginator
           :rows="8"
           size="small"
@@ -194,14 +384,14 @@ function exportCSV() {
           </Column>
           <Column field="status" header="Status" sortable style="width:9rem">
             <template #body="{ data }">
-              <Tag :value="data.status" :severity="statusSeverity[data.status]" />
+              <Tag :value="data.status" :severity="statusSeverity[data.status] ?? 'secondary'" />
             </template>
           </Column>
           <Column header="" style="width:5rem" body-class="text-right">
             <template #body="{ data }">
               <div class="flex items-center justify-end gap-1">
-                <Button icon="pi pi-pencil" text rounded size="small" severity="secondary" aria-label="Editar" @click="openEdit(data)" />
-                <Button icon="pi pi-trash" text rounded size="small" severity="danger" aria-label="Excluir" @click="deleteEntry(data.id)" />
+                <Button icon="pi pi-pencil" text rounded size="small" severity="secondary" aria-label="Editar entrada" @click="openEdit(data)" />
+                <Button icon="pi pi-trash" text rounded size="small" severity="danger" aria-label="Excluir entrada" @click="deleteEntry(data.id)" />
               </div>
             </template>
           </Column>
@@ -213,164 +403,69 @@ function exportCSV() {
               <p class="mt-1 text-xs text-surface-400">Clique em "Nova entrada" para registrar.</p>
             </div>
           </template>
-          <template #loading>
-            <div class="space-y-2 p-3">
-              <Skeleton v-for="i in 5" :key="i" height="2.5rem" />
-            </div>
-          </template>
         </DataTable>
       </div>
     </PageContent>
 
-    <!-- Modal de formulário two-column -->
     <Dialog
       v-model:visible="drawerOpen"
       modal
       :header="editingId ? 'Editar entrada' : 'Conta a receber'"
-      class="!w-[900px] !max-w-[96vw]"
+      class="!w-[720px] !max-w-[96vw]"
       :draggable="false"
     >
-      <form class="flex min-h-[420px] gap-0 divide-x divide-surface-200 dark:divide-surface-800" @submit.prevent="saveEntry">
-        <!-- Painel esquerdo -->
-        <div class="flex w-72 flex-shrink-0 flex-col gap-4 pr-6">
-          <div class="flex flex-col gap-1.5">
-            <label class="text-[10px] font-bold uppercase tracking-widest text-surface-400">Valor do recebimento</label>
-            <InputNumber v-model="form.valor" mode="currency" currency="BRL" locale="pt-BR" fluid :input-style="{ fontSize: '1.25rem', fontWeight: '700' }" />
-          </div>
-          <div class="flex flex-col gap-2">
-            <div class="flex items-center gap-2">
-              <Checkbox v-model="form.jaRecebido" binary input-id="ja-recebido" />
-              <label for="ja-recebido" class="cursor-pointer text-sm">Já foi recebido</label>
-            </div>
-            <DatePicker v-if="form.jaRecebido" v-model="form.dataRecebimento" date-format="dd/mm/yy" show-icon fluid placeholder="Data do recebimento" />
-          </div>
-          <div class="flex flex-col gap-1.5">
-            <label class="text-[10px] font-bold uppercase tracking-widest text-surface-400">Descrição</label>
-            <Textarea v-model="form.descricao" rows="3" placeholder="Breve descrição do lançamento..." fluid />
-          </div>
-          <div class="flex flex-col gap-1.5">
-            <label class="text-[10px] font-bold uppercase tracking-widest text-surface-400">Categoria</label>
-            <Select v-model="form.categoria" :options="categoriaOptions" placeholder="Selecione a categoria..." fluid />
-          </div>
-          <div class="flex flex-col gap-1.5">
-            <label class="text-[10px] font-bold uppercase tracking-widest text-surface-400">Conta</label>
-            <Select v-model="form.conta" :options="contaOptions" placeholder="Selecione a conta..." fluid />
-          </div>
-          <div class="mt-auto pt-2">
-            <Button type="submit" label="Adicionar" fluid icon="pi pi-check" />
-          </div>
+      <form class="grid gap-4 md:grid-cols-2" @submit.prevent="saveEntry">
+        <div class="flex flex-col gap-1.5">
+          <label class="text-xs font-semibold uppercase tracking-wide text-surface-500">Valor do recebimento</label>
+          <InputNumber v-model="form.valor" mode="currency" currency="BRL" locale="pt-BR" fluid />
         </div>
-
-        <!-- Painel direito -->
-        <div class="flex min-w-0 flex-1 flex-col pl-6">
-          <!-- Abas -->
-          <div class="mb-5 flex border-b border-surface-200 dark:border-surface-800">
-            <button
-              v-for="(tab, i) in modalTabs"
-              :key="i"
-              type="button"
-              class="-mb-px border-b-2 px-4 py-2 text-sm font-medium transition-colors"
-              :class="activeModalTab === i
-                ? 'border-brand-600 text-brand-600 dark:border-brand-300 dark:text-brand-300'
-                : 'border-transparent text-surface-500 hover:text-surface-800 dark:hover:text-surface-200'"
-              @click="activeModalTab = i"
-            >{{ tab }}</button>
-          </div>
-
-          <!-- Tab: Dados do Lançamento -->
-          <div v-if="activeModalTab === 0" class="space-y-4">
-            <div class="grid grid-cols-2 gap-3">
-              <div class="flex flex-col gap-1.5">
-                <label class="text-[10px] font-bold uppercase tracking-widest text-surface-400">Data de Competência</label>
-                <DatePicker v-model="form.dataCompetencia" date-format="dd/mm/yy" show-icon fluid />
-              </div>
-              <div class="flex flex-col gap-1.5">
-                <label class="text-[10px] font-bold uppercase tracking-widest text-surface-400">Data de Vencimento</label>
-                <DatePicker v-model="form.dataVencimento" date-format="dd/mm/yy" show-icon fluid />
-              </div>
-            </div>
-            <div class="flex flex-col gap-1.5">
-              <label class="text-[10px] font-bold uppercase tracking-widest text-surface-400">Cliente</label>
-              <Select v-model="form.cliente" :options="clienteOptions" placeholder="Selecione o cliente..." fluid />
-            </div>
-            <div class="grid grid-cols-2 gap-3">
-              <div class="flex flex-col gap-1.5">
-                <label class="text-[10px] font-bold uppercase tracking-widest text-surface-400">Serviço</label>
-                <Select v-model="form.servico" :options="servicoOptions" placeholder="Selecione..." fluid />
-              </div>
-              <div class="flex flex-col gap-1.5">
-                <label class="text-[10px] font-bold uppercase tracking-widest text-surface-400">Status</label>
-                <Select v-model="form.status" :options="statusOptions" fluid />
-              </div>
-            </div>
-            <div class="grid grid-cols-2 gap-3">
-              <div class="flex flex-col gap-1.5">
-                <label class="text-[10px] font-bold uppercase tracking-widest text-surface-400">Centro de Custo</label>
-                <Select v-model="form.centroCusto" :options="centroCustoOptions" placeholder="Selecione..." fluid />
-              </div>
-              <div class="flex flex-col gap-1.5">
-                <label class="text-[10px] font-bold uppercase tracking-widest text-surface-400">Taxas e Juros</label>
-                <Select v-model="form.taxa" :options="taxaOptions" placeholder="Selecione..." fluid />
-              </div>
-            </div>
-            <div class="flex items-center gap-2 rounded-lg bg-surface-50 px-3 py-2 text-sm dark:bg-surface-800">
-              <i class="pi pi-info-circle text-surface-400" />
-              <span class="text-surface-500">Unidade de negócio: <strong class="font-semibold text-surface-700 dark:text-surface-200">Supervisão</strong></span>
-            </div>
-          </div>
-
-          <!-- Tab: Recorrência -->
-          <div v-else-if="activeModalTab === 1" class="space-y-4">
-            <div class="flex items-center justify-between rounded-xl border border-surface-200 p-4 dark:border-surface-800">
-              <div>
-                <p class="text-sm font-semibold text-surface-800 dark:text-surface-100">Lançamento recorrente</p>
-                <p class="mt-0.5 text-xs text-surface-400">Repetir automaticamente em intervalo definido</p>
-              </div>
-              <ToggleSwitch v-model="form.recorrente" />
-            </div>
-            <template v-if="form.recorrente">
-              <div class="grid grid-cols-2 gap-3">
-                <div class="flex flex-col gap-1.5">
-                  <label class="text-[10px] font-bold uppercase tracking-widest text-surface-400">Frequência</label>
-                  <Select v-model="form.recorrenciaFreq" :options="['Diário','Semanal','Mensal','Anual']" fluid />
-                </div>
-                <div class="flex flex-col gap-1.5">
-                  <label class="text-[10px] font-bold uppercase tracking-widest text-surface-400">Repetir por</label>
-                  <Select v-model="form.recorrenciaQtd" :options="['3 meses','6 meses','12 meses','Indefinidamente']" fluid />
-                </div>
-              </div>
-              <div class="flex items-center gap-2 rounded-lg bg-surface-50 px-3 py-2.5 text-xs text-surface-500 dark:bg-surface-800">
-                <i class="pi pi-info-circle" />
-                Serão geradas cobranças automáticas conforme a frequência selecionada.
-              </div>
-            </template>
-            <p v-else class="py-4 text-center text-xs text-surface-400">
-              Ative para configurar repetição automática deste lançamento.
-            </p>
-          </div>
-
-          <!-- Tab: Adicionais -->
-          <div v-else-if="activeModalTab === 2" class="flex flex-1 flex-col items-center justify-center py-12 text-center">
-            <i class="pi pi-list mb-3 text-4xl text-surface-200 dark:text-surface-700" />
-            <p class="text-sm font-medium text-surface-500">Nenhum campo adicional configurado</p>
-          </div>
-
-          <!-- Tab: Documentos -->
-          <div v-else-if="activeModalTab === 3" class="space-y-4">
-            <label class="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-surface-200 py-10 transition-colors hover:border-brand-300 dark:border-surface-700 dark:hover:border-brand-600">
-              <input type="file" class="sr-only" multiple accept=".pdf,.docx,.xlsx,.png,.jpg" />
-              <i class="pi pi-cloud-upload text-4xl text-surface-300" />
-              <p class="text-sm font-medium text-surface-600 dark:text-surface-400">
-                Arraste arquivos aqui ou <span class="text-brand-600 dark:text-brand-300">clique para selecionar</span>
-              </p>
-              <p class="text-[10px] text-surface-300">PDF, DOCX, XLSX, PNG, JPG · máx. 10 MB por arquivo</p>
-            </label>
-            <div class="rounded-xl border border-surface-100 dark:border-surface-800">
-              <p class="px-4 py-3 text-center text-xs text-surface-400">Nenhum arquivo anexado ainda.</p>
-            </div>
-          </div>
+        <div class="flex flex-col gap-1.5">
+          <label class="text-xs font-semibold uppercase tracking-wide text-surface-500">Data de competência</label>
+          <DatePicker v-model="form.dataCompetencia" date-format="dd/mm/yy" show-icon fluid />
+        </div>
+        <div class="flex flex-col gap-1.5">
+          <label class="text-xs font-semibold uppercase tracking-wide text-surface-500">Cliente</label>
+          <Select v-model="form.cliente" :options="clienteOptions" placeholder="Selecione o cliente" filter fluid />
+        </div>
+        <div class="flex flex-col gap-1.5">
+          <label class="text-xs font-semibold uppercase tracking-wide text-surface-500">Serviço</label>
+          <Select v-model="form.servico" :options="servicoOptions" placeholder="Selecione o serviço" filter fluid />
+        </div>
+        <div class="flex flex-col gap-1.5">
+          <label class="text-xs font-semibold uppercase tracking-wide text-surface-500">Categoria</label>
+          <Select v-model="form.categoria" :options="categoriaOptions" placeholder="Selecione a categoria" filter fluid />
+        </div>
+        <div class="flex flex-col gap-1.5">
+          <label class="text-xs font-semibold uppercase tracking-wide text-surface-500">Conta bancária</label>
+          <Select v-model="form.conta" :options="contaOptions" placeholder="Selecione a conta" filter fluid />
+        </div>
+        <div class="flex flex-col gap-1.5">
+          <label class="text-xs font-semibold uppercase tracking-wide text-surface-500">Deslocamento</label>
+          <InputNumber v-model="form.deslocamento" mode="currency" currency="BRL" locale="pt-BR" fluid />
+        </div>
+        <div class="flex flex-col gap-1.5">
+          <label class="text-xs font-semibold uppercase tracking-wide text-surface-500">Status</label>
+          <Select v-model="form.status" :options="statusOptions" fluid />
+        </div>
+        <div class="flex items-center gap-2 md:col-span-2">
+          <Checkbox v-model="form.jaRecebido" binary input-id="ja-recebido" />
+          <label for="ja-recebido" class="cursor-pointer text-sm">Já foi recebido</label>
+        </div>
+        <div v-if="form.jaRecebido" class="flex flex-col gap-1.5 md:col-span-2">
+          <label class="text-xs font-semibold uppercase tracking-wide text-surface-500">Data do recebimento</label>
+          <DatePicker v-model="form.dataRecebimento" date-format="dd/mm/yy" show-icon fluid />
+        </div>
+        <div class="flex flex-col gap-1.5 md:col-span-2">
+          <label class="text-xs font-semibold uppercase tracking-wide text-surface-500">Descrição</label>
+          <Textarea v-model="form.descricao" rows="3" fluid />
         </div>
       </form>
+      <template #footer>
+        <div class="flex gap-2 pt-1">
+          <Button label="Cancelar" severity="secondary" outlined fluid @click="drawerOpen = false" />
+          <Button :label="editingId ? 'Salvar' : 'Adicionar'" :loading="saving" fluid @click="saveEntry" />
+        </div>
+      </template>
     </Dialog>
   </div>
 </template>

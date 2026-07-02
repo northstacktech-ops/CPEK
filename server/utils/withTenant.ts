@@ -22,7 +22,7 @@ export function withTenant<T>(
     prisma.$transaction(async (tx) => {
       // is_local = true → escopo da transação; seguro com pooler em transaction mode
       await tx.$executeRaw`select set_config('app.current_tenant', ${tenantId}, true)`
-      return fn(tx)
+      return fn(tx as unknown as Prisma.TransactionClient)
     }),
   )
 }

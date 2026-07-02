@@ -39,10 +39,12 @@ async function main() {
     // Empresa Supervisão (idempotente por (tenantId, name)).
     let company = await tx.company.findFirst({
       where: { tenantId: DEMO_TENANT_ID, name: template.companyName },
+      select: { id: true, name: true, segment: true },
     })
     if (!company) {
       company = await tx.company.create({
         data: { tenantId: DEMO_TENANT_ID, name: template.companyName, segment: template.segment },
+        select: { id: true, name: true, segment: true },
       })
     }
 

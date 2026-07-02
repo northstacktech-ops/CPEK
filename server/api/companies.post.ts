@@ -17,6 +17,7 @@ export default defineEventHandler(async (event) => {
   return withTenant(auth.tenantId, async (tx) => {
     const company = await tx.company.create({
       data: { tenantId: auth.tenantId, name: body.name, segment: body.segment ?? template.segment },
+      select: { id: true, name: true, segment: true, active: true },
     })
     await applyTemplate(tx, auth.tenantId, company.id, template)
     return { company }

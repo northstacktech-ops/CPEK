@@ -1,12 +1,22 @@
-// POST /api/periods/:id/reopen — reabrir período (admin, com audit) (§8, §14, D §19).
-import { requireAdmin, validateBody, notImplemented } from '../../../utils/http'
+import { isDemoAuth } from '../../../utils/demo'
+import { writeAudit } from '../../../utils/audit'
+import { apiError, requireAdmin, validateBody } from '../../../utils/http'
+import { withTenant } from '../../../utils/withTenant'
 import { closePeriodBody } from '../../../utils/validators/periods'
 
 export default defineEventHandler(async (event) => {
-  requireAdmin(event)
-  const _id = getRouterParam(event, 'id')
-  await validateBody(event, closePeriodBody) // confirm: true
-  // TODO(§14): withTenant → status=OPEN; writeAudit('PERIOD_REOPEN').
-  void _id
-  return notImplemented('§14')
+  const auth = requireAdmin(event)
+  const id = getRouterParam(event, 'id')
+  if (!id) throw apiError(400, 'MISSING_ID', 'Id obrigatorio')
+  await validateBody(event, closePeriodBody)
+  if (isDemoAuth(auth)) return { item: { id, status: 'OPEN' } }
+
+  return withTenant(auth.tenantId, async (tx) => {
+    const item = await tx.period.update({
+      where: { id },
+      data: { status: 'OPEN', closedAt: null, closedById: null },
+    })
+    await writeAudit(tx, { tenantId: auth.tenantId, userId: auth.userId, action: 'PERIOD_REOPEN', entity: 'Period', entityId: id })
+    return { item }
+  })
 })

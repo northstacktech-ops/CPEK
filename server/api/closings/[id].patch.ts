@@ -1,12 +1,22 @@
-// PATCH /api/closings/:id — editar (409 PERIOD_CLOSED se período fechado) (§8, regra 4).
-import { requireAuth, validateBody, notImplemented } from '../../utils/http'
+import { isDemoAuth } from '../../utils/demo'
+import { apiError, periodClosedError, requireAuth, validateBody } from '../../utils/http'
+import { withTenant } from '../../utils/withTenant'
 import { updateClosingBody } from '../../utils/validators/closings'
 
 export default defineEventHandler(async (event) => {
-  requireAuth(event)
-  const _id = getRouterParam(event, 'id')
-  await validateBody(event, updateClosingBody)
-  // TODO(§8): withTenant → checar period.status; se CLOSED → periodClosedError(); senão update.
-  void _id
-  return notImplemented('§8')
+  const auth = requireAuth(event)
+  const id = getRouterParam(event, 'id')
+  if (!id) throw apiError(400, 'MISSING_ID', 'Id obrigatorio')
+  const body = await validateBody(event, updateClosingBody)
+  if (isDemoAuth(auth)) return { item: { id, ...body } }
+
+  return withTenant(auth.tenantId, async (tx) => {
+    const current = await tx.closing.findUnique({ where: { id }, include: { period: true } })
+    if (!current) throw apiError(404, 'NOT_FOUND', 'Fechamento não encontrado')
+    if (current.period.status === 'CLOSED') throw periodClosedError()
+    const { custom, ...data } = body
+    void custom
+    const item = await tx.closing.update({ where: { id }, data })
+    return { item }
+  })
 })

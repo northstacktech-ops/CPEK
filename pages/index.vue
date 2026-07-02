@@ -1,74 +1,100 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import type { DashboardData } from '../types/dashboard'
+import { computed, onMounted, ref, watch } from 'vue'
 import { navigateTo } from '#imports'
 import AppBreadcrumb from '../components/layout/AppBreadcrumb.vue'
 import PageContent from '../components/layout/PageContent.vue'
 import PageHeader from '../components/layout/PageHeader.vue'
 import { useCompanyStore } from '../stores/company'
+import { usePeriodStore } from '../stores/period'
 
 const company = useCompanyStore()
-const period = ref(new Date(2026, 5, 1))
+const periodStore = usePeriodStore()
+const { load } = useDashboard()
+
+const period = ref(new Date(periodStore.year, periodStore.month - 1, 1))
 const accountSearch = ref('')
 const loading = ref(false)
 const error = ref<string | null>(null)
+const dashboard = ref<DashboardData | null>(null)
+const reducedMotion = ref(false)
 
-const companyData = {
-  sp: {
-    kpis: [
-      { label: 'Lucro Real', value: 27600, reference: 'Margem 55,8%', icon: 'pi pi-chart-line', severity: 'success', featured: true },
-      { label: 'Faturamento', value: 49420, reference: 'Prev. R$ 58.315', icon: 'pi pi-arrow-up-right', severity: 'info' },
-      { label: 'Despesas', value: 21820, reference: 'Prev. R$ 23.129', icon: 'pi pi-credit-card', severity: 'danger' },
-      { label: 'Ticket Médio', value: 3088.75, reference: 'por entrada', icon: 'pi pi-shopping-cart', severity: 'secondary' },
-      { label: 'Vencidos', value: 13910, reference: '5 em atraso', icon: 'pi pi-exclamation-triangle', severity: 'warn' },
-    ],
-    accounts: [
-      { id: 'bol-itau', name: 'Boleto Itaú', type: 'Recebimento', balance: 88067.75 },
-      { id: 'cx-loja', name: 'Caixa Loja', type: 'Caixa', balance: 794.5 },
-      { id: 'card', name: 'Cartão Créd./Déb.', type: 'Cartão', balance: 15376.5 },
-      { id: 'cortesia', name: 'Conta Cortesia', type: 'Cortesia', balance: 10081.8 },
-    ],
-    chartRealizado: [15200, 32200, 51500, 71200, 89500, 114320, null, null, null, null, null, null],
-    chartPrevisto: [17800, 36500, 56800, 78200, 99200, 121500, 150000, 176000, 202000, 228000, 252000, 278000],
-  },
-  rj: {
-    kpis: [
-      { label: 'Lucro Real', value: 18400, reference: 'Margem 51,2%', icon: 'pi pi-chart-line', severity: 'success', featured: true },
-      { label: 'Faturamento', value: 35920, reference: 'Prev. R$ 42.000', icon: 'pi pi-arrow-up-right', severity: 'info' },
-      { label: 'Despesas', value: 17520, reference: 'Prev. R$ 18.900', icon: 'pi pi-credit-card', severity: 'danger' },
-      { label: 'Ticket Médio', value: 2244, reference: 'por entrada', icon: 'pi pi-shopping-cart', severity: 'secondary' },
-      { label: 'Vencidos', value: 8250, reference: '3 em atraso', icon: 'pi pi-exclamation-triangle', severity: 'warn' },
-    ],
-    accounts: [
-      { id: 'itau-rj', name: 'Conta Itaú RJ', type: 'Recebimento', balance: 52340.20 },
-      { id: 'cx-rj', name: 'Caixa RJ', type: 'Caixa', balance: 1230.80 },
-      { id: 'card-rj', name: 'Cartão Empresarial', type: 'Cartão', balance: 9876.0 },
-    ],
-    chartRealizado: [9800, 19200, 30100, 41500, 54200, 69120, null, null, null, null, null, null],
-    chartPrevisto: [11000, 22000, 34000, 47000, 61000, 76000, 93000, 110000, 128000, 145000, 162000, 180000],
-  },
+const emptyDashboard = computed<DashboardData>(() => ({
+  cards: { faturamentoBruto: 0, despesas: 0, lucroReal: 0, ticketMedio: 0, vencidos: 0 },
+  accounts: [],
+  consolidatedBalance: 0,
+  cashFlow: Array.from({ length: 12 }, (_, index) => ({
+    date: `${periodStore.year}-${String(index + 1).padStart(2, '0')}-01`,
+    realized: 0,
+    planned: 0,
+  })),
+}))
+
+async function refreshDashboard() {
+  if (!company.activeId) return
+  loading.value = true
+  error.value = null
+
+  try {
+    dashboard.value = await load()
+  } catch {
+    dashboard.value = null
+    error.value = 'Não foi possível carregar o painel. Verifique sua conexão e tente novamente.'
+  } finally {
+    loading.value = false
+  }
 }
 
-const currentData = computed(() => {
-  return company.active?.name?.includes('RJ') ? companyData.rj : companyData.sp
+watch(period, (value) => {
+  periodStore.set(value.getMonth() + 1, value.getFullYear())
+  void refreshDashboard()
 })
 
-const kpis = computed(() => currentData.value.kpis)
-const accounts = computed(() => currentData.value.accounts)
+watch(() => company.activeId, () => {
+  void refreshDashboard()
+})
+
+onMounted(() => {
+  reducedMotion.value = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  void refreshDashboard()
+})
+
+const currentData = computed(() => dashboard.value ?? emptyDashboard.value)
+
+const kpis = computed(() => {
+  const cards = currentData.value.cards
+  const margin = cards.faturamentoBruto ? (cards.lucroReal / cards.faturamentoBruto) * 100 : 0
+
+  return [
+    { label: 'Lucro Real', value: cards.lucroReal, reference: `Margem ${margin.toFixed(1)}%`, icon: 'pi pi-chart-line', severity: 'success', featured: true },
+    { label: 'Faturamento', value: cards.faturamentoBruto, reference: 'Bruto no período', icon: 'pi pi-arrow-up-right', severity: 'info' },
+    { label: 'Despesas', value: cards.despesas, reference: 'Saídas registradas', icon: 'pi pi-credit-card', severity: 'danger' },
+    { label: 'Ticket Médio', value: cards.ticketMedio, reference: 'por entrada', icon: 'pi pi-shopping-cart', severity: 'secondary' },
+    { label: 'Vencidos', value: cards.vencidos, reference: 'Pendências abertas', icon: 'pi pi-exclamation-triangle', severity: 'warn' },
+  ]
+})
+
+const accounts = computed(() =>
+  currentData.value.accounts.map((account) => ({
+    id: account.bankAccountId,
+    name: account.name,
+    type: 'Conta bancária',
+    balance: account.balance,
+  })),
+)
 
 const filteredAccounts = computed(() => {
   const q = accountSearch.value.trim().toLowerCase()
   if (!q) return accounts.value
-  return accounts.value.filter((a) => `${a.name} ${a.type}`.toLowerCase().includes(q))
+  return accounts.value.filter((account) => `${account.name} ${account.type}`.toLowerCase().includes(q))
 })
-
-const consolidatedBalance = computed(() => accounts.value.reduce((t, a) => t + a.balance, 0))
 
 const chartData = computed(() => ({
   labels: ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'],
   datasets: [
     {
       label: 'Realizado',
-      data: currentData.value.chartRealizado,
+      data: currentData.value.cashFlow.map((point, index) => (index + 1 <= periodStore.month ? point.realized : null)),
       borderColor: '#163E75',
       backgroundColor: 'rgba(22, 62, 117, 0.1)',
       fill: true,
@@ -79,7 +105,7 @@ const chartData = computed(() => ({
     },
     {
       label: 'Previsto',
-      data: currentData.value.chartPrevisto,
+      data: currentData.value.cashFlow.map((point) => point.planned),
       borderColor: '#C43A34',
       fill: false,
       tension: 0.35,
@@ -89,13 +115,43 @@ const chartData = computed(() => ({
   ],
 }))
 
-const chartOptions = {
+const chartOptions = computed(() => ({
   maintainAspectRatio: false,
+  responsive: true,
+  resizeDelay: 120,
+  animation: reducedMotion.value
+    ? false
+    : {
+        duration: 950,
+        easing: 'easeOutQuart',
+      },
+  animations: reducedMotion.value
+    ? {}
+    : {
+        tension: {
+          duration: 800,
+          easing: 'easeOutCubic',
+          from: 0.12,
+          to: 0.35,
+        },
+        y: {
+          duration: 900,
+          easing: 'easeOutQuart',
+          from: 0,
+        },
+      },
+  transitions: {
+    active: {
+      animation: {
+        duration: reducedMotion.value ? 0 : 180,
+      },
+    },
+  },
   plugins: {
     legend: {
       position: 'top' as const,
       align: 'start' as const,
-      labels: { boxHeight: 2, boxWidth: 24, color: '#94A3B8', font: { family: 'Inter', size: 11, weight: '600' } },
+      labels: { boxHeight: 2, boxWidth: 24, color: '#94A3B8', font: { size: 11, weight: '600' } },
     },
     tooltip: {
       callbacks: {
@@ -112,16 +168,16 @@ const chartOptions = {
       ticks: { color: '#94A3B8', font: { size: 11 }, callback: (v: number | string) => `R$${Number(v) / 1000}k` },
     },
   },
-}
+}))
 
-const brl = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+const brl = (value: number) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 </script>
 
 <template>
   <div>
     <PageHeader
       title="Painel"
-      :description="`${company.active?.name ?? 'Empresa'} · Junho de 2026`"
+      :description="`${company.active?.name ?? 'Empresa'} · ${periodStore.label}`"
     >
       <template #breadcrumb>
         <AppBreadcrumb :items="[{ label: 'Painel' }]" />
@@ -132,12 +188,11 @@ const brl = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', curren
       </template>
     </PageHeader>
 
-    <Message severity="info" size="small" class="mb-4">
-      Dados de demonstração — APIs em implementação.
-    </Message>
-
     <PageContent>
-      <!-- KPIs -->
+      <Message v-if="error" severity="error" size="small" class="col-span-12">
+        {{ error }}
+      </Message>
+
       <div class="col-span-12 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
         <div
           v-for="kpi in kpis"
@@ -170,7 +225,6 @@ const brl = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', curren
         </div>
       </div>
 
-      <!-- Contas -->
       <Card class="col-span-12 border border-surface-200 dark:border-surface-800 xl:col-span-5">
         <template #title>
           <span>Contas bancárias</span>
@@ -180,10 +234,12 @@ const brl = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', curren
             <i class="pi pi-search pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-surface-400" />
             <InputText v-model="accountSearch" placeholder="Buscar conta" size="small" class="w-full pl-9" />
           </div>
+          <TableSkeleton v-if="loading" :rows="5" :columns="2" />
+
           <DataTable
+            v-else
             :value="filteredAccounts"
             data-key="id"
-            :loading="loading"
             :rows="5"
             size="small"
             sort-field="balance"
@@ -203,25 +259,30 @@ const brl = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', curren
               </template>
             </Column>
             <template #empty>
-              <div class="py-8 text-center text-sm text-surface-400">Nenhuma conta encontrada.</div>
+              <div class="py-8 text-center text-sm text-surface-400">
+                Nenhuma conta encontrada. Cadastre uma conta para acompanhar o saldo.
+              </div>
             </template>
           </DataTable>
           <Divider class="!my-3" />
           <div class="flex items-center justify-between rounded-lg bg-brand-50 px-3 py-2.5 dark:bg-brand-600/15">
             <span class="text-sm font-semibold text-brand-700 dark:text-brand-200">Saldo Consolidado</span>
-            <strong class="text-base tabular-nums text-brand-700 dark:text-brand-200">{{ brl(consolidatedBalance) }}</strong>
+            <strong class="text-base tabular-nums text-brand-700 dark:text-brand-200">{{ brl(currentData.consolidatedBalance) }}</strong>
           </div>
         </template>
       </Card>
 
-      <!-- Gráfico -->
       <Card class="col-span-12 border border-surface-200 dark:border-surface-800 xl:col-span-7">
         <template #title>Fluxo de Caixa Acumulado</template>
-        <template #subtitle>Realizado até jun · Previsto até dez</template>
+        <template #subtitle>Realizado até o período selecionado · Previsto para o ano</template>
         <template #content>
-          <Message v-if="error" severity="error" size="small" class="mb-3">{{ error }}</Message>
           <Skeleton v-if="loading" height="14rem" />
-          <Chart v-else type="line" :data="chartData" :options="chartOptions" class="h-56" />
+          <ClientOnly v-else>
+            <Chart type="line" :data="chartData" :options="chartOptions" class="h-64 md:h-72" />
+            <template #fallback>
+              <Skeleton height="14rem" />
+            </template>
+          </ClientOnly>
         </template>
       </Card>
     </PageContent>

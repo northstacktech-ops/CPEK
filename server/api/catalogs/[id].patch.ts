@@ -1,11 +1,17 @@
-// PATCH /api/catalogs/:id — editar/desativar (ARCHITECTURE §5).
-import { requireAuth, validateBody, notImplemented } from '../../utils/http'
+import { isDemoAuth } from '../../utils/demo'
+import { apiError, requireAuth, validateBody } from '../../utils/http'
+import { withTenant } from '../../utils/withTenant'
 import { updateCatalogBody } from '../../utils/validators/catalogs'
 
 export default defineEventHandler(async (event) => {
-  requireAuth(event)
-  const _id = getRouterParam(event, 'id')
-  await validateBody(event, updateCatalogBody)
-  void _id
-  return notImplemented('§5')
+  const auth = requireAuth(event)
+  const id = getRouterParam(event, 'id')
+  if (!id) throw apiError(400, 'MISSING_ID', 'Id obrigatorio')
+  const body = await validateBody(event, updateCatalogBody)
+  if (isDemoAuth(auth)) return { item: { id, ...body } }
+
+  return withTenant(auth.tenantId, async (tx) => {
+    const item = await tx.catalogValue.update({ where: { id }, data: body })
+    return { item }
+  })
 })

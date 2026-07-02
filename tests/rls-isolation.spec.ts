@@ -12,6 +12,8 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { TENANT_A, TENANT_B, cleanup, prismaBase, seedTenant, withTenant } from './helpers/db'
 
+const describeWithDatabase = process.env.DATABASE_URL ? describe : describe.skip
+
 const TENANT_MODELS = [
   'company',
   'bankAccount',
@@ -27,18 +29,18 @@ const TENANT_MODELS = [
   'auditLog',
 ] as const
 
-beforeAll(async () => {
-  await cleanup()
-  await seedTenant(TENANT_A)
-  await seedTenant(TENANT_B)
-}, 30_000)
+describeWithDatabase('Isolamento RLS (matriz)', () => {
+  beforeAll(async () => {
+    await cleanup()
+    await seedTenant(TENANT_A)
+    await seedTenant(TENANT_B)
+  }, 30_000)
 
-afterAll(async () => {
-  await cleanup()
-  await prismaBase.$disconnect()
-})
+  afterAll(async () => {
+    await cleanup()
+    await prismaBase.$disconnect()
+  })
 
-describe('Isolamento RLS (matriz)', () => {
   it.each(TENANT_MODELS)('tenant A não enxerga %s do tenant B', async (model) => {
     await withTenant(TENANT_A, async (tx) => {
       const rows = await (tx as any)[model].findMany()

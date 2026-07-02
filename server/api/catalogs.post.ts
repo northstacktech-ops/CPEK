@@ -1,9 +1,24 @@
-// POST /api/catalogs — criar valor de catálogo (CATEGORY carrega dreGroup) §5, §7.
-import { requireAuth, validateBody, notImplemented } from '../utils/http'
+import { isDemoAuth } from '../utils/demo'
+import { requireAuth, validateBody } from '../utils/http'
+import { withTenant } from '../utils/withTenant'
 import { createCatalogBody } from '../utils/validators/catalogs'
 
 export default defineEventHandler(async (event) => {
-  requireAuth(event)
-  await validateBody(event, createCatalogBody)
-  return notImplemented('§5')
+  const auth = requireAuth(event)
+  const body = await validateBody(event, createCatalogBody)
+  if (isDemoAuth(auth)) return { item: { id: `demo-catalog-${Date.now()}`, active: true, ...body } }
+
+  return withTenant(auth.tenantId, async (tx) => {
+    const item = await tx.catalogValue.create({
+      data: {
+        tenantId: auth.tenantId,
+        companyId: body.companyId,
+        kind: body.kind,
+        label: body.label,
+        order: body.order,
+        dreGroup: body.dreGroup,
+      },
+    })
+    return { item }
+  })
 })

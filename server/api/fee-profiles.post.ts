@@ -1,9 +1,17 @@
-// POST /api/fee-profiles — criar perfil de taxa/juros (Decimal(14,4)) (ARCHITECTURE §5).
-import { requireAuth, validateBody, notImplemented } from '../utils/http'
+import { isDemoAuth } from '../utils/demo'
+import { requireAuth, validateBody } from '../utils/http'
+import { withTenant } from '../utils/withTenant'
 import { createFeeProfileBody } from '../utils/validators/feeProfiles'
 
 export default defineEventHandler(async (event) => {
-  requireAuth(event)
-  await validateBody(event, createFeeProfileBody)
-  return notImplemented('§5')
+  const auth = requireAuth(event)
+  const body = await validateBody(event, createFeeProfileBody)
+  if (isDemoAuth(auth)) return { item: { id: `demo-fee-${Date.now()}`, active: true, ...body } }
+
+  return withTenant(auth.tenantId, async (tx) => {
+    const item = await tx.feeProfile.create({
+      data: { tenantId: auth.tenantId, ...body },
+    })
+    return { item: { ...item, value: Number(item.value) } }
+  })
 })

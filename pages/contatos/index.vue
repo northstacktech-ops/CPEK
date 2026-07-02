@@ -1,63 +1,202 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
-import { navigateTo } from '#imports'
+import { computed, onMounted, ref, watch } from 'vue'
 import AppBreadcrumb from '../../components/layout/AppBreadcrumb.vue'
 import PageHeader from '../../components/layout/PageHeader.vue'
 import PageContent from '../../components/layout/PageContent.vue'
+import { useCompanyStore } from '../../stores/company'
+
+interface ContactRecord {
+  id: string
+  companyId?: string | null
+  type: 'CLIENT' | 'SUPPLIER'
+  name: string
+  contact?: string | null
+  phone?: string | null
+  email?: string | null
+  taxId?: string | null
+  address?: string | null
+  notes?: string | null
+  active?: boolean
+}
+
+interface ContactRow {
+  id: string
+  nome: string
+  tipo: 'Cliente' | 'Fornecedor'
+  telefone: string
+  email: string
+  cpfCnpj: string
+  status: 'Ativo' | 'Inativo'
+  raw: ContactRecord
+}
+
+const company = useCompanyStore()
+const { api } = useApi()
 
 const loading = ref(false)
+const saving = ref(false)
+const error = ref<string | null>(null)
 const search = ref('')
-const tipoFiltro = ref<string | null>(null)
+const activeTab = ref<'CLIENT' | 'SUPPLIER'>('CLIENT')
 const drawerOpen = ref(false)
 const editingId = ref<string | null>(null)
 
+const contacts = ref<ContactRow[]>([])
 const form = ref({ nome: '', tipo: 'Cliente', contato: '', telefone: '', email: '', cpfCnpj: '', endereco: '', obs: '' })
 const tipoOptions = ['Cliente', 'Fornecedor']
-const statusSeverity: Record<string, string> = { 'Ativo': 'success', 'Inativo': 'secondary' }
+const statusSeverity: Record<string, string> = { Ativo: 'success', Inativo: 'secondary' }
 
-const contacts = ref([
-  { id: '1', nome: 'Marcos Andrade', tipo: 'Cliente', telefone: '(11) 98765-4321', email: 'marcos@email.com', cpfCnpj: '123.456.789-00', status: 'Ativo' },
-  { id: '2', nome: 'Imobiliária ABC', tipo: 'Fornecedor', telefone: '(11) 3456-7890', email: 'contato@abc.com.br', cpfCnpj: '12.345.678/0001-99', status: 'Ativo' },
-  { id: '3', nome: 'Ana Lima', tipo: 'Cliente', telefone: '(21) 99123-4567', email: 'ana@email.com', cpfCnpj: '987.654.321-00', status: 'Ativo' },
-  { id: '4', nome: 'Posto Shell', tipo: 'Fornecedor', telefone: '(11) 2345-6789', email: 'shell@posto.com', cpfCnpj: '98.765.432/0001-11', status: 'Ativo' },
-  { id: '5', nome: 'Roberto Souza', tipo: 'Cliente', telefone: '(31) 97654-3210', email: 'roberto@email.com', cpfCnpj: '456.789.123-00', status: 'Ativo' },
-  { id: '6', nome: 'Google Brasil', tipo: 'Fornecedor', telefone: '(11) 4000-0000', email: 'ads@google.com', cpfCnpj: '06.990.590/0001-23', status: 'Ativo' },
-  { id: '7', nome: 'Juliana Costa', tipo: 'Cliente', telefone: '(41) 98888-7777', email: 'juliana@email.com', cpfCnpj: '321.654.987-00', status: 'Inativo' },
-])
+const currentTypeLabel = computed(() => (activeTab.value === 'CLIENT' ? 'cliente' : 'fornecedor'))
+const currentTypePlural = computed(() => (activeTab.value === 'CLIENT' ? 'clientes' : 'fornecedores'))
+const newButtonLabel = computed(() => (activeTab.value === 'CLIENT' ? 'Novo cliente' : 'Novo fornecedor'))
+
+const counts = computed(() => ({
+  CLIENT: contacts.value.filter((contact) => contact.raw.type === 'CLIENT').length,
+  SUPPLIER: contacts.value.filter((contact) => contact.raw.type === 'SUPPLIER').length,
+}))
 
 const filtered = computed(() => {
-  let list = contacts.value
-  if (tipoFiltro.value) list = list.filter((c) => c.tipo === tipoFiltro.value)
   const q = search.value.trim().toLowerCase()
-  if (q) list = list.filter((c) => `${c.nome} ${c.email} ${c.cpfCnpj}`.toLowerCase().includes(q))
-  return list
+  return contacts.value.filter((contact) => {
+    const matchesType = contact.raw.type === activeTab.value
+    const matchesSearch = !q || `${contact.nome} ${contact.email} ${contact.cpfCnpj} ${contact.telefone}`.toLowerCase().includes(q)
+    return matchesType && matchesSearch
+  })
 })
+
+function apiType(label: string): 'CLIENT' | 'SUPPLIER' {
+  return label === 'Fornecedor' ? 'SUPPLIER' : 'CLIENT'
+}
+
+function uiType(type: 'CLIENT' | 'SUPPLIER'): 'Cliente' | 'Fornecedor' {
+  return type === 'SUPPLIER' ? 'Fornecedor' : 'Cliente'
+}
+
+function normalizeContact(contact: ContactRecord): ContactRow {
+  return {
+    id: contact.id,
+    nome: contact.name,
+    tipo: uiType(contact.type),
+    telefone: contact.phone ?? '-',
+    email: contact.email ?? '-',
+    cpfCnpj: contact.taxId ?? '-',
+    status: contact.active === false ? 'Inativo' : 'Ativo',
+    raw: contact,
+  }
+}
+
+async function loadContacts() {
+  loading.value = true
+  error.value = null
+
+  try {
+    const response = await api<{ items: ContactRecord[] }>('/api/contacts', {
+      query: { companyId: company.activeId ?? undefined },
+    })
+    contacts.value = response.items.map(normalizeContact)
+  } catch {
+    error.value = 'Não foi possível carregar os contatos.'
+  } finally {
+    loading.value = false
+  }
+}
+
+function resetForm(type = activeTab.value) {
+  form.value = {
+    nome: '',
+    tipo: uiType(type),
+    contato: '',
+    telefone: '',
+    email: '',
+    cpfCnpj: '',
+    endereco: '',
+    obs: '',
+  }
+}
 
 function openNew() {
   editingId.value = null
-  form.value = { nome: '', tipo: 'Cliente', contato: '', telefone: '', email: '', cpfCnpj: '', endereco: '', obs: '' }
+  resetForm()
   drawerOpen.value = true
 }
 
-function openEdit(row: typeof contacts.value[0]) {
+function openEdit(row: ContactRow) {
   editingId.value = row.id
-  form.value = { nome: row.nome, tipo: row.tipo, contato: '', telefone: row.telefone, email: row.email, cpfCnpj: row.cpfCnpj, endereco: '', obs: '' }
+  form.value = {
+    nome: row.raw.name,
+    tipo: uiType(row.raw.type),
+    contato: row.raw.contact ?? '',
+    telefone: row.raw.phone ?? '',
+    email: row.raw.email ?? '',
+    cpfCnpj: row.raw.taxId ?? '',
+    endereco: row.raw.address ?? '',
+    obs: row.raw.notes ?? '',
+  }
   drawerOpen.value = true
 }
 
-function save() {
-  if (editingId.value) {
-    const idx = contacts.value.findIndex(c => c.id === editingId.value)
-    if (idx !== -1) contacts.value[idx] = { ...contacts.value[idx], nome: form.value.nome, tipo: form.value.tipo, telefone: form.value.telefone, email: form.value.email, cpfCnpj: form.value.cpfCnpj }
-  } else {
-    contacts.value.unshift({ id: String(Date.now()), nome: form.value.nome, tipo: form.value.tipo, telefone: form.value.telefone, email: form.value.email, cpfCnpj: form.value.cpfCnpj, status: 'Ativo' })
+async function save() {
+  if (saving.value) return
+  saving.value = true
+  error.value = null
+
+  try {
+    const body = {
+      companyId: company.activeId ?? undefined,
+      type: apiType(form.value.tipo),
+      name: form.value.nome,
+      contact: form.value.contato || undefined,
+      phone: form.value.telefone || undefined,
+      email: form.value.email || undefined,
+      taxId: form.value.cpfCnpj || undefined,
+      address: form.value.endereco || undefined,
+      notes: form.value.obs || undefined,
+    }
+
+    const response = editingId.value
+      ? await api<{ item: ContactRecord }>(`/api/contacts/${editingId.value}`, { method: 'PATCH', body })
+      : await api<{ item: ContactRecord }>('/api/contacts', { method: 'POST', body })
+
+    const normalized = normalizeContact({ active: true, ...response.item })
+    if (editingId.value) {
+      contacts.value = contacts.value.map((contact) => (contact.id === editingId.value ? normalized : contact))
+    } else {
+      contacts.value = [normalized, ...contacts.value]
+      activeTab.value = normalized.raw.type
+    }
+    drawerOpen.value = false
+  } catch {
+    error.value = 'Não foi possível salvar o contato.'
+  } finally {
+    saving.value = false
   }
-  drawerOpen.value = false
 }
 
-function toggleStatus(row: typeof contacts.value[0]) {
-  row.status = row.status === 'Ativo' ? 'Inativo' : 'Ativo'
+async function toggleStatus(row: ContactRow) {
+  const nextActive = row.status !== 'Ativo'
+  try {
+    const response = await api<{ item: ContactRecord }>(`/api/contacts/${row.id}`, {
+      method: 'PATCH',
+      body: { active: nextActive },
+    })
+    contacts.value = contacts.value.map((contact) =>
+      contact.id === row.id ? normalizeContact({ ...row.raw, ...response.item, active: nextActive }) : contact,
+    )
+  } catch {
+    error.value = 'Não foi possível alterar o status do contato.'
+  }
 }
+
+watch(
+  () => company.activeId,
+  () => {
+    void loadContacts()
+  },
+)
+
+onMounted(() => {
+  void loadContacts()
+})
 </script>
 
 <template>
@@ -67,107 +206,127 @@ function toggleStatus(row: typeof contacts.value[0]) {
         <AppBreadcrumb :items="[{ label: 'Contatos' }]" />
       </template>
       <template #actions>
-        <Button icon="pi pi-plus" label="Novo contato" size="small" @click="openNew" />
+        <Button icon="pi pi-plus" :label="newButtonLabel" size="small" @click="openNew" />
       </template>
     </PageHeader>
 
     <PageContent>
-      <div class="col-span-12">
-        <div class="mb-3 flex items-center gap-2">
-          <IconField class="w-64">
-            <InputIcon class="pi pi-search" />
-            <InputText v-model="search" placeholder="Buscar nome, e-mail, CNPJ..." size="small" />
-          </IconField>
-          <Select v-model="tipoFiltro" :options="tipoOptions" placeholder="Tipo" show-clear size="small" class="w-36" />
-        </div>
+      <Message v-if="error" severity="error" size="small" class="col-span-12">{{ error }}</Message>
 
-        <DataTable
-          :value="filtered"
-          data-key="id"
-          :loading="loading"
-          paginator
-          :rows="8"
-          size="small"
-          class="cpek-table"
-          row-hover
-          @row-click="(e) => navigateTo('/contatos/' + e.data.id)"
-        >
-          <Column field="nome" header="Nome" sortable />
-          <Column field="tipo" header="Tipo" sortable style="width:9rem">
-            <template #body="{ data }">
-              <Tag :value="data.tipo" :severity="data.tipo === 'Cliente' ? 'info' : 'secondary'" />
-            </template>
-          </Column>
-          <Column field="telefone" header="Telefone" style="width:11rem" />
-          <Column field="email" header="E-mail" />
-          <Column field="cpfCnpj" header="CPF / CNPJ" style="width:13rem" />
-          <Column field="status" header="Status" sortable style="width:8rem">
-            <template #body="{ data }">
-              <Tag :value="data.status" :severity="statusSeverity[data.status]" />
-            </template>
-          </Column>
-          <Column header="" style="width:5rem" body-class="text-right">
-            <template #body="{ data }">
-              <div class="flex justify-end gap-1">
-                <Button icon="pi pi-pencil" text rounded size="small" severity="secondary" aria-label="Editar" @click.stop="openEdit(data)" />
-                <Button
-                  :icon="data.status === 'Ativo' ? 'pi pi-ban' : 'pi pi-check-circle'"
-                  text rounded size="small"
-                  :severity="data.status === 'Ativo' ? 'secondary' : 'success'"
-                  :aria-label="data.status === 'Ativo' ? 'Desativar' : 'Reativar'"
-                  @click.stop="toggleStatus(data)"
-                />
+      <Card class="col-span-12 border border-surface-200 dark:border-surface-800">
+        <template #content>
+          <div class="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <Tabs v-model:value="activeTab" class="w-full md:w-auto">
+              <TabList>
+                <Tab value="CLIENT">
+                  Clientes
+                  <Badge :value="counts.CLIENT" severity="info" class="ml-2" />
+                </Tab>
+                <Tab value="SUPPLIER">
+                  Fornecedores
+                  <Badge :value="counts.SUPPLIER" severity="secondary" class="ml-2" />
+                </Tab>
+              </TabList>
+            </Tabs>
+
+            <IconField class="w-full md:w-80">
+              <InputIcon class="pi pi-search" />
+              <InputText v-model="search" :placeholder="`Buscar ${currentTypePlural}`" size="small" fluid />
+            </IconField>
+          </div>
+
+          <TableSkeleton v-if="loading" :rows="6" :columns="6" />
+
+          <DataTable
+            v-else
+            :value="filtered"
+            data-key="id"
+            paginator
+            :rows="8"
+            size="small"
+            class="cpek-table"
+            row-hover
+            scrollable
+            scroll-height="520px"
+          >
+            <Column field="nome" header="Nome" sortable frozen />
+            <Column field="telefone" header="Telefone" style="width:11rem" />
+            <Column field="email" header="E-mail" />
+            <Column field="cpfCnpj" header="CPF / CNPJ" style="width:13rem" />
+            <Column field="status" header="Status" sortable style="width:8rem">
+              <template #body="{ data }">
+                <Tag :value="data.status" :severity="statusSeverity[data.status]" />
+              </template>
+            </Column>
+            <Column header="" style="width:5rem" body-class="text-right" align-frozen="right" frozen>
+              <template #body="{ data }">
+                <div class="flex justify-end gap-1">
+                  <Button icon="pi pi-pencil" text rounded size="small" severity="secondary" aria-label="Editar contato" @click="openEdit(data)" />
+                  <Button
+                    :icon="data.status === 'Ativo' ? 'pi pi-ban' : 'pi pi-check-circle'"
+                    text
+                    rounded
+                    size="small"
+                    :severity="data.status === 'Ativo' ? 'secondary' : 'success'"
+                    :aria-label="data.status === 'Ativo' ? 'Desativar contato' : 'Reativar contato'"
+                    @click="toggleStatus(data)"
+                  />
+                </div>
+              </template>
+            </Column>
+            <template #empty>
+              <div class="flex flex-col items-center py-10 text-center">
+                <i class="pi pi-users mb-3 text-3xl text-surface-300" />
+                <p class="text-sm font-medium text-surface-500">Nenhum {{ currentTypeLabel }} encontrado</p>
+                <p class="mt-1 text-xs text-surface-400">Clique em "{{ newButtonLabel }}" para cadastrar.</p>
               </div>
             </template>
-          </Column>
-          <template #empty>
-            <div class="flex flex-col items-center py-10 text-center">
-              <i class="pi pi-users mb-3 text-3xl text-surface-300" />
-              <p class="text-sm font-medium text-surface-500">Nenhum contato encontrado</p>
-              <p class="mt-1 text-xs text-surface-400">Clique em "Novo contato" para adicionar.</p>
-            </div>
-          </template>
-        </DataTable>
-      </div>
+          </DataTable>
+        </template>
+      </Card>
     </PageContent>
 
-    <Dialog v-model:visible="drawerOpen" modal :header="editingId ? 'Editar contato' : 'Novo contato'" class="!w-[480px] !max-w-[96vw]" :draggable="false">
+    <Dialog v-model:visible="drawerOpen" modal :header="editingId ? 'Editar contato' : newButtonLabel" class="!w-[520px] !max-w-[96vw]" :draggable="false">
       <form class="space-y-4" @submit.prevent="save">
         <div class="flex flex-col gap-1.5">
-          <label class="text-xs font-semibold uppercase tracking-wide text-surface-500">Tipo</label>
-          <SelectButton v-model="form.tipo" :options="tipoOptions" />
+          <label for="contact-type" class="text-xs font-semibold uppercase tracking-wide text-surface-500">Tipo</label>
+          <SelectButton id="contact-type" v-model="form.tipo" :options="tipoOptions" />
         </div>
         <div class="flex flex-col gap-1.5">
-          <label class="text-xs font-semibold uppercase tracking-wide text-surface-500">Nome</label>
-          <InputText v-model="form.nome" fluid />
+          <label for="contact-name" class="text-xs font-semibold uppercase tracking-wide text-surface-500">Nome</label>
+          <InputText id="contact-name" v-model="form.nome" fluid />
         </div>
         <div class="flex flex-col gap-1.5">
-          <label class="text-xs font-semibold uppercase tracking-wide text-surface-500">Pessoa de contato</label>
-          <InputText v-model="form.contato" fluid />
+          <label for="contact-person" class="text-xs font-semibold uppercase tracking-wide text-surface-500">Pessoa de contato</label>
+          <InputText id="contact-person" v-model="form.contato" fluid />
         </div>
-        <div class="grid grid-cols-2 gap-3">
+        <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
           <div class="flex flex-col gap-1.5">
-            <label class="text-xs font-semibold uppercase tracking-wide text-surface-500">Telefone</label>
-            <InputMask v-model="form.telefone" mask="(99) 99999-9999" fluid />
+            <label for="contact-phone" class="text-xs font-semibold uppercase tracking-wide text-surface-500">Telefone</label>
+            <InputText id="contact-phone" v-model="form.telefone" fluid />
           </div>
           <div class="flex flex-col gap-1.5">
-            <label class="text-xs font-semibold uppercase tracking-wide text-surface-500">CPF / CNPJ</label>
-            <InputText v-model="form.cpfCnpj" fluid />
+            <label for="contact-tax-id" class="text-xs font-semibold uppercase tracking-wide text-surface-500">CPF / CNPJ</label>
+            <InputText id="contact-tax-id" v-model="form.cpfCnpj" fluid />
           </div>
         </div>
         <div class="flex flex-col gap-1.5">
-          <label class="text-xs font-semibold uppercase tracking-wide text-surface-500">E-mail</label>
-          <InputText v-model="form.email" type="email" fluid />
+          <label for="contact-email" class="text-xs font-semibold uppercase tracking-wide text-surface-500">E-mail</label>
+          <InputText id="contact-email" v-model="form.email" type="email" fluid />
         </div>
         <div class="flex flex-col gap-1.5">
-          <label class="text-xs font-semibold uppercase tracking-wide text-surface-500">Observações</label>
-          <Textarea v-model="form.obs" rows="3" fluid />
+          <label for="contact-address" class="text-xs font-semibold uppercase tracking-wide text-surface-500">Endereço</label>
+          <InputText id="contact-address" v-model="form.endereco" fluid />
+        </div>
+        <div class="flex flex-col gap-1.5">
+          <label for="contact-notes" class="text-xs font-semibold uppercase tracking-wide text-surface-500">Observações</label>
+          <Textarea id="contact-notes" v-model="form.obs" rows="3" fluid />
         </div>
       </form>
       <template #footer>
         <div class="flex gap-2 pt-1">
           <Button label="Cancelar" severity="secondary" outlined fluid @click="drawerOpen = false" />
-          <Button label="Salvar" fluid @click="save" />
+          <Button label="Salvar" :loading="saving" fluid @click="save" />
         </div>
       </template>
     </Dialog>

@@ -1,296 +1,471 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import AppBreadcrumb from '../components/layout/AppBreadcrumb.vue'
 import PageHeader from '../components/layout/PageHeader.vue'
 import PageContent from '../components/layout/PageContent.vue'
+import { useCompanyStore, type CompanyRef } from '../stores/company'
 
-const activeTab = ref(0)
-const editMode = ref(false)
-const inviteDrawerOpen = ref(false)
-const inviteEmail = ref('')
-const inviteRole = ref('Membro')
-const editingEmpresaId = ref<string | null>(null)
-const empresaDrawerOpen = ref(false)
-const empresaForm = ref({ nome: '', cnpj: '' })
-
-const roleOptions = ['Admin', 'Membro', 'Visualizador']
-
-const conta = ref({ nome: 'Supervisão Vistorias', plano: 'Profissional', email: 'admin@supervisao.com.br' })
-const contaOriginal = { ...conta.value }
-
-function startEdit() { editMode.value = true }
-function cancelEdit() { conta.value = { ...contaOriginal }; editMode.value = false }
-function saveEdit() { editMode.value = false }
-
-const empresas = ref([
-  { id: '1', nome: 'Supervisão Vistorias SP', cnpj: '12.345.678/0001-99', status: 'Ativa' },
-  { id: '2', nome: 'Supervisão Vistorias RJ', cnpj: '98.765.432/0001-11', status: 'Ativa' },
-])
-
-const membros = ref([
-  { id: '1', nome: 'Rafael Mendonça', email: 'rafael@supervisao.com.br', papel: 'Admin', status: 'Ativo' },
-  { id: '2', nome: 'Marcos Silva', email: 'marcos@supervisao.com', papel: 'Membro', status: 'Ativo' },
-])
-
-const auditoria = ref([
-  { id: '1', data: '26/06/2026 14:32', autor: 'Rafael Mendonça', acao: 'CREATE', entidade: 'Entrada', detalhe: 'Cautelar · Marcos Andrade · R$ 320,00' },
-  { id: '2', data: '26/06/2026 13:10', autor: 'Rafael Mendonça', acao: 'UPDATE', entidade: 'Contato', detalhe: 'Status → Inativo · Juliana Costa' },
-  { id: '3', data: '25/06/2026 18:00', autor: 'Marcos Silva', acao: 'CREATE', entidade: 'Saída', detalhe: 'Folha de Pagamento · R$ 8.500,00' },
-  { id: '4', data: '25/06/2026 11:45', autor: 'Rafael Mendonça', acao: 'DELETE', entidade: 'Fechamento', detalhe: 'Ana Lima · R$ 960,00' },
-  { id: '5', data: '24/06/2026 09:20', autor: 'Marcos Silva', acao: 'LOGIN', entidade: 'Sessão', detalhe: 'Acesso via email/senha' },
-])
-
-const acaoSeverity: Record<string, string> = { CREATE: 'success', UPDATE: 'info', DELETE: 'danger', LOGIN: 'secondary' }
-
-function saveInvite() { inviteDrawerOpen.value = false; inviteEmail.value = '' }
-
-function openEditEmpresa(row: typeof empresas.value[0]) {
-  editingEmpresaId.value = row.id
-  empresaForm.value = { nome: row.nome, cnpj: row.cnpj }
-  empresaDrawerOpen.value = true
+type CompanyProfile = Required<Omit<CompanyRef, 'id' | 'updatedAt'>> & {
+  id: string
+  updatedAt: string | null
 }
 
-function saveEmpresa() {
-  const idx = empresas.value.findIndex(e => e.id === editingEmpresaId.value)
-  if (idx !== -1) empresas.value[idx] = { ...empresas.value[idx], ...empresaForm.value }
-  empresaDrawerOpen.value = false
+const company = useCompanyStore()
+const { load: loadCompanies } = useCompany()
+const { api } = useApi()
+
+const loading = ref(true)
+const saving = ref(false)
+const editing = ref(false)
+const error = ref<string | null>(null)
+const savedMessage = ref<string | null>(null)
+
+const emptyProfile: CompanyProfile = {
+  id: '',
+  name: '',
+  legalName: '',
+  taxId: '',
+  segment: '',
+  active: true,
+  responsible: '',
+  email: '',
+  phone: '',
+  whatsapp: '',
+  zipCode: '',
+  address: '',
+  number: '',
+  complement: '',
+  district: '',
+  city: '',
+  state: 'RS',
+  municipalRegistration: '',
+  stateRegistration: '',
+  businessHours: '',
+  notes: '',
+  updatedAt: null,
 }
 
-const deleteDialogOpen = ref(false)
-const deleteConfirmText = ref('')
-const canDelete = computed(() => deleteConfirmText.value === 'EXCLUIR')
+const form = reactive<CompanyProfile>({ ...emptyProfile })
 
-const tabs = [
-  { label: 'Conta', icon: 'pi pi-user' },
-  { label: 'Empresas', icon: 'pi pi-building' },
-  { label: 'Membros', icon: 'pi pi-users' },
-  { label: 'Auditoria', icon: 'pi pi-history' },
+const stateOptions = [
+  'AC',
+  'AL',
+  'AP',
+  'AM',
+  'BA',
+  'CE',
+  'DF',
+  'ES',
+  'GO',
+  'MA',
+  'MT',
+  'MS',
+  'MG',
+  'PA',
+  'PB',
+  'PR',
+  'PE',
+  'PI',
+  'RJ',
+  'RN',
+  'RS',
+  'RO',
+  'RR',
+  'SC',
+  'SP',
+  'SE',
+  'TO',
+].map((value) => ({ label: value, value }))
+
+const segmentOptions = [
+  { label: 'Vistoria Cautelar', value: 'Vistoria Cautelar' },
+  { label: 'Perícia Veicular', value: 'Perícia Veicular' },
+  { label: 'Inspeção Automotiva', value: 'Inspeção Automotiva' },
+  { label: 'Administrativo', value: 'Administrativo' },
 ]
+
+const activeCompany = computed(() => company.active)
+const lastUpdateLabel = computed(() => {
+  if (!form.updatedAt) return 'Ainda não atualizado'
+  return new Intl.DateTimeFormat('pt-BR', {
+    dateStyle: 'short',
+    timeStyle: 'short',
+  }).format(new Date(form.updatedAt))
+})
+
+const addressLine = computed(() => {
+  const street = [form.address, form.number].filter(Boolean).join(', ')
+  const area = [form.district, form.city, form.state].filter(Boolean).join(' - ')
+  return [street, area, form.zipCode].filter(Boolean).join(' · ')
+})
+
+const sections = computed(() => [
+  {
+    title: 'Identificação',
+    icon: 'pi pi-building',
+    items: [
+      { label: 'Nome fantasia', value: form.name },
+      { label: 'Razão social', value: form.legalName },
+      { label: 'CNPJ', value: form.taxId },
+      { label: 'Segmento', value: form.segment },
+    ],
+  },
+  {
+    title: 'Contato',
+    icon: 'pi pi-phone',
+    items: [
+      { label: 'Responsável', value: form.responsible },
+      { label: 'E-mail', value: form.email },
+      { label: 'Telefone', value: form.phone },
+      { label: 'WhatsApp', value: form.whatsapp },
+    ],
+  },
+  {
+    title: 'Localização',
+    icon: 'pi pi-map-marker',
+    items: [
+      { label: 'Endereço', value: addressLine.value },
+      { label: 'Complemento', value: form.complement },
+      { label: 'Cidade/UF', value: [form.city, form.state].filter(Boolean).join(' / ') },
+      { label: 'CEP', value: form.zipCode },
+    ],
+  },
+  {
+    title: 'Fiscal e operação',
+    icon: 'pi pi-briefcase',
+    items: [
+      { label: 'Inscrição municipal', value: form.municipalRegistration },
+      { label: 'Inscrição estadual', value: form.stateRegistration },
+      { label: 'Horário de atendimento', value: form.businessHours },
+      { label: 'Observações', value: form.notes },
+    ],
+  },
+])
+
+function asText(value: unknown) {
+  if (value == null || value === '') return '-'
+  return String(value)
+}
+
+function normalizeProfile(current: CompanyRef | null): CompanyProfile {
+  return {
+    ...emptyProfile,
+    ...current,
+    id: current?.id ?? '',
+    name: current?.name ?? '',
+    segment: current?.segment ?? '',
+    active: current?.active ?? true,
+    updatedAt: current?.updatedAt ?? null,
+    legalName: current?.legalName ?? '',
+    taxId: current?.taxId ?? '',
+    responsible: current?.responsible ?? '',
+    email: current?.email ?? '',
+    phone: current?.phone ?? '',
+    whatsapp: current?.whatsapp ?? '',
+    zipCode: current?.zipCode ?? '',
+    address: current?.address ?? '',
+    number: current?.number ?? '',
+    complement: current?.complement ?? '',
+    district: current?.district ?? '',
+    city: current?.city ?? '',
+    state: current?.state ?? 'RS',
+    municipalRegistration: current?.municipalRegistration ?? '',
+    stateRegistration: current?.stateRegistration ?? '',
+    businessHours: current?.businessHours ?? '',
+    notes: current?.notes ?? '',
+  }
+}
+
+function applyProfile(current: CompanyRef | null) {
+  Object.assign(form, normalizeProfile(current))
+}
+
+function syncCompanyStore(updated: CompanyRef) {
+  company.setCompanies(company.companies.map((item) => (item.id === updated.id ? { ...item, ...updated } : item)))
+}
+
+async function reload() {
+  loading.value = true
+  error.value = null
+
+  try {
+    await loadCompanies()
+    applyProfile(activeCompany.value)
+  } catch {
+    error.value = 'Não foi possível carregar os dados da empresa.'
+  } finally {
+    loading.value = false
+  }
+}
+
+function startEditing() {
+  applyProfile(activeCompany.value)
+  savedMessage.value = null
+  error.value = null
+  editing.value = true
+}
+
+function cancelEditing() {
+  applyProfile(activeCompany.value)
+  editing.value = false
+  error.value = null
+}
+
+async function saveCompany() {
+  if (!activeCompany.value || saving.value) return
+
+  if (!form.name.trim()) {
+    error.value = 'Informe o nome fantasia da empresa antes de salvar.'
+    savedMessage.value = null
+    return
+  }
+
+  saving.value = true
+  error.value = null
+  savedMessage.value = null
+
+  try {
+    const response = await api<{ item: CompanyRef }>('/api/companies', {
+      method: 'PATCH',
+      body: {
+        id: form.id,
+        name: form.name.trim(),
+        legalName: form.legalName || null,
+        taxId: form.taxId || null,
+        segment: form.segment || null,
+        active: form.active,
+        responsible: form.responsible || null,
+        email: form.email || null,
+        phone: form.phone || null,
+        whatsapp: form.whatsapp || null,
+        zipCode: form.zipCode || null,
+        address: form.address || null,
+        number: form.number || null,
+        complement: form.complement || null,
+        district: form.district || null,
+        city: form.city || null,
+        state: form.state || null,
+        municipalRegistration: form.municipalRegistration || null,
+        stateRegistration: form.stateRegistration || null,
+        businessHours: form.businessHours || null,
+        notes: form.notes || null,
+      },
+    })
+
+    syncCompanyStore(response.item)
+    applyProfile(response.item)
+    editing.value = false
+    savedMessage.value = 'Dados da empresa salvos com sucesso.'
+  } catch {
+    error.value = 'Não foi possível salvar os dados da empresa agora.'
+  } finally {
+    saving.value = false
+  }
+}
+
+onMounted(reload)
+
+watch(
+  () => company.activeId,
+  () => {
+    if (!loading.value) applyProfile(activeCompany.value)
+  },
+)
 </script>
 
 <template>
   <div>
-    <PageHeader title="Configurações">
+    <PageHeader
+      title="Configurações da empresa"
+      description="Gerencie os dados cadastrais, localização e operação da empresa ativa."
+    >
       <template #breadcrumb>
-        <AppBreadcrumb :items="[{ label: 'Configurações' }]" />
+        <AppBreadcrumb :items="[{ label: 'Configurações' }, { label: 'Empresa' }]" />
+      </template>
+      <template #actions>
+        <Button
+          v-if="!editing"
+          label="Editar"
+          icon="pi pi-pencil"
+          :disabled="loading || !activeCompany"
+          @click="startEditing"
+        />
+        <div v-else class="flex gap-2">
+          <Button label="Cancelar" severity="secondary" outlined :disabled="saving" @click="cancelEditing" />
+          <Button label="Salvar" icon="pi pi-save" :loading="saving" @click="saveCompany" />
+        </div>
       </template>
     </PageHeader>
 
-    <!-- Tabs nav -->
-    <div class="mb-4 flex gap-1 border-b border-surface-200 dark:border-surface-800">
-      <button
-        v-for="(tab, i) in tabs"
-        :key="tab.label"
-        class="flex items-center gap-1.5 border-b-2 px-4 py-2 text-sm font-medium transition-colors"
-        :class="activeTab === i
-          ? 'border-brand-600 text-brand-600 font-semibold'
-          : 'border-transparent text-surface-500 hover:text-surface-800 dark:hover:text-surface-200'"
-        @click="activeTab = i"
-      >
-        <i :class="tab.icon" class="text-xs" />
-        {{ tab.label }}
-      </button>
-    </div>
+    <PageContent>
+      <Message v-if="error" severity="error" size="small" class="col-span-12">
+        {{ error }}
+      </Message>
+      <Message v-if="savedMessage" severity="success" size="small" class="col-span-12">
+        {{ savedMessage }}
+      </Message>
 
-    <!-- Tab: Conta -->
-    <PageContent v-if="activeTab === 0">
-      <div class="col-span-12 md:col-span-6">
-        <div class="rounded-xl border border-surface-200 bg-surface-0 p-6 dark:border-surface-800 dark:bg-surface-900">
-          <div class="mb-4 flex items-center justify-between">
-            <h2 class="text-base font-bold text-surface-900 dark:text-surface-0">Dados da conta</h2>
-            <Button
-              v-if="!editMode"
-              label="Editar"
-              icon="pi pi-pencil"
-              severity="secondary"
-              outlined
-              size="small"
-              @click="startEdit"
-            />
-            <div v-else class="flex gap-2">
-              <Button label="Salvar" icon="pi pi-check" size="small" @click="saveEdit" />
-              <Button label="Cancelar" severity="secondary" outlined size="small" @click="cancelEdit" />
-            </div>
-          </div>
-
-          <div class="space-y-4">
-            <!-- Nome -->
-            <div class="flex flex-col gap-1.5">
-              <span class="text-xs font-semibold uppercase tracking-wide text-surface-500">Nome da empresa</span>
-              <InputText v-if="editMode" v-model="conta.nome" fluid />
-              <p v-else class="text-sm font-medium text-surface-800 dark:text-surface-100">{{ conta.nome }}</p>
-            </div>
-            <!-- E-mail -->
-            <div class="flex flex-col gap-1.5">
-              <span class="text-xs font-semibold uppercase tracking-wide text-surface-500">E-mail de acesso</span>
-              <InputText v-if="editMode" v-model="conta.email" type="email" fluid />
-              <p v-else class="text-sm font-medium text-surface-800 dark:text-surface-100">{{ conta.email }}</p>
-            </div>
-            <!-- Plano -->
-            <div class="flex flex-col gap-1.5">
-              <span class="text-xs font-semibold uppercase tracking-wide text-surface-500">Plano</span>
-              <div class="flex items-center gap-2">
-                <p class="text-sm font-medium text-surface-800 dark:text-surface-100">{{ conta.plano }}</p>
-                <Tag value="Ativo" severity="success" />
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="col-span-12">
-        <Accordion>
-          <AccordionPanel value="danger">
-            <AccordionHeader>
-              <span class="flex items-center gap-2 text-sm text-red-600 dark:text-red-400">
-                <i class="pi pi-exclamation-triangle text-xs" />
-                Ações avançadas
-              </span>
-            </AccordionHeader>
-            <AccordionContent>
-              <div class="space-y-2 px-1">
-                <p class="text-sm text-surface-500">Ações irreversíveis que afetam toda a conta.</p>
-                <Button label="Excluir conta" severity="danger" outlined size="small" icon="pi pi-trash" @click="deleteDialogOpen = true" />
-              </div>
-            </AccordionContent>
-          </AccordionPanel>
-        </Accordion>
-      </div>
-
-      <Dialog v-model:visible="deleteDialogOpen" modal header="Excluir conta" class="!w-[440px]" :draggable="false">
-        <div class="space-y-4">
-          <Message severity="error" size="small">Esta ação é permanente e não pode ser desfeita.</Message>
-          <p class="text-sm text-surface-600 dark:text-surface-400">
-            Todos os dados, lançamentos, contatos e configurações serão excluídos permanentemente.
-            Para confirmar, digite <strong class="font-mono text-surface-900 dark:text-surface-0">EXCLUIR</strong> no campo abaixo.
-          </p>
-          <InputText v-model="deleteConfirmText" placeholder="Digite EXCLUIR para confirmar" class="font-mono" fluid />
-          <div class="flex gap-2 pt-1">
-            <Button label="Cancelar" severity="secondary" outlined fluid @click="deleteDialogOpen = false; deleteConfirmText = ''" />
-            <Button label="Confirmar exclusão" severity="danger" :disabled="!canDelete" fluid />
-          </div>
-        </div>
-      </Dialog>
-    </PageContent>
-
-    <!-- Tab: Empresas -->
-    <PageContent v-else-if="activeTab === 1">
-      <div class="col-span-12">
-        <div class="mb-3 flex items-center justify-between">
-          <p class="text-sm text-surface-500">{{ empresas.length }} empresa(s) cadastrada(s)</p>
-          <Button label="Adicionar empresa" icon="pi pi-plus" size="small" />
-        </div>
-        <DataTable :value="empresas" data-key="id" size="small" class="cpek-table">
-          <Column field="nome" header="Empresa" sortable />
-          <Column field="cnpj" header="CNPJ" style="width:14rem" />
-          <Column field="status" header="Status" style="width:8rem">
-            <template #body="{ data }"><Tag :value="data.status" severity="success" /></template>
-          </Column>
-          <Column header="" style="width:5rem" body-class="text-right">
-            <template #body="{ data }">
-              <Button
-                icon="pi pi-pencil"
-                text
-                rounded
-                size="small"
-                severity="secondary"
-                @click="openEditEmpresa(data)"
-              />
-            </template>
-          </Column>
-        </DataTable>
-      </div>
-    </PageContent>
-
-    <!-- Tab: Membros -->
-    <PageContent v-else-if="activeTab === 2">
-      <div class="col-span-12">
-        <div class="mb-3 flex items-center justify-between">
-          <p class="text-sm text-surface-500">{{ membros.length }} membro(s)</p>
-          <Button label="Convidar membro" icon="pi pi-user-plus" size="small" @click="inviteDrawerOpen = true" />
-        </div>
-        <DataTable :value="membros" data-key="id" size="small" class="cpek-table">
-          <Column field="nome" header="Nome" sortable />
-          <Column field="email" header="E-mail" />
-          <Column field="papel" header="Papel" style="width:10rem">
-            <template #body="{ data }">
-              <Tag :value="data.papel" :severity="data.papel === 'Admin' ? 'warn' : 'secondary'" />
-            </template>
-          </Column>
-          <Column field="status" header="Status" style="width:8rem">
-            <template #body="{ data }"><Tag :value="data.status" severity="success" /></template>
-          </Column>
-          <Column header="" style="width:5rem" body-class="text-right">
-            <template #body>
-              <Button icon="pi pi-ban" text rounded size="small" severity="danger" />
-            </template>
-          </Column>
-        </DataTable>
-      </div>
-    </PageContent>
-
-    <!-- Tab: Auditoria -->
-    <PageContent v-else-if="activeTab === 3">
-      <div class="col-span-12">
-        <DataTable :value="auditoria" data-key="id" size="small" class="cpek-table" paginator :rows="10">
-          <Column field="data" header="Data / Hora" sortable style="width:13rem" />
-          <Column field="autor" header="Autor" sortable style="width:12rem" />
-          <Column field="acao" header="Ação" style="width:8rem">
-            <template #body="{ data }"><Tag :value="data.acao" :severity="acaoSeverity[data.acao]" /></template>
-          </Column>
-          <Column field="entidade" header="Entidade" style="width:9rem" />
-          <Column field="detalhe" header="Detalhe" />
-          <template #empty>
-            <div class="flex flex-col items-center py-10 text-center">
-              <i class="pi pi-history mb-3 text-3xl text-surface-300" />
-              <p class="text-sm text-surface-500">Nenhum evento registrado</p>
+      <div v-if="loading" class="col-span-12 grid grid-cols-1 gap-3 xl:grid-cols-4">
+        <Card v-for="index in 4" :key="index" class="border border-surface-200 dark:border-surface-800">
+          <template #content>
+            <Skeleton width="8rem" height="1rem" class="mb-4" />
+            <div class="space-y-3">
+              <Skeleton v-for="line in 4" :key="line" height="1.75rem" />
             </div>
           </template>
-        </DataTable>
+        </Card>
       </div>
+
+      <template v-else>
+        <Card class="col-span-12 border border-surface-200 dark:border-surface-800">
+          <template #content>
+            <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <div class="min-w-0">
+                <div class="mb-2 flex flex-wrap items-center gap-2">
+                  <h2 class="truncate text-xl font-bold text-surface-900 dark:text-surface-0">{{ form.name || 'Empresa sem nome' }}</h2>
+                  <Tag :value="form.active ? 'Ativa' : 'Inativa'" :severity="form.active ? 'success' : 'secondary'" />
+                </div>
+                <p class="text-sm text-surface-500">{{ form.legalName || 'Razão social não informada' }}</p>
+              </div>
+              <div class="grid grid-cols-2 gap-2 text-sm md:w-auto">
+                <div class="rounded-lg border border-surface-200 px-3 py-2 dark:border-surface-800">
+                  <span class="block text-[10px] font-bold uppercase tracking-wide text-surface-400">Cidade</span>
+                  <strong class="text-surface-800 dark:text-surface-100">{{ asText(form.city) }}</strong>
+                </div>
+                <div class="rounded-lg border border-surface-200 px-3 py-2 dark:border-surface-800">
+                  <span class="block text-[10px] font-bold uppercase tracking-wide text-surface-400">Atualização</span>
+                  <strong class="text-surface-800 dark:text-surface-100">{{ lastUpdateLabel }}</strong>
+                </div>
+              </div>
+            </div>
+          </template>
+        </Card>
+
+        <template v-if="!editing">
+          <Card
+            v-for="section in sections"
+            :key="section.title"
+            class="col-span-12 border border-surface-200 dark:border-surface-800 lg:col-span-6"
+          >
+            <template #title>
+              <span class="flex items-center gap-2 text-base">
+                <i :class="section.icon" class="text-brand-600" />
+                {{ section.title }}
+              </span>
+            </template>
+            <template #content>
+              <dl class="grid grid-cols-1 gap-x-4 gap-y-3 md:grid-cols-2">
+                <div v-for="item in section.items" :key="item.label" class="min-w-0">
+                  <dt class="text-[10px] font-bold uppercase tracking-wide text-surface-400">{{ item.label }}</dt>
+                  <dd class="mt-1 break-words text-sm font-medium text-surface-800 dark:text-surface-100">
+                    {{ asText(item.value) }}
+                  </dd>
+                </div>
+              </dl>
+            </template>
+          </Card>
+        </template>
+
+        <form v-else class="col-span-12 grid grid-cols-12 gap-3" @submit.prevent="saveCompany">
+          <Card class="col-span-12 border border-surface-200 dark:border-surface-800">
+            <template #title>Editar dados da empresa</template>
+            <template #subtitle>Altere somente os campos necessários e salve para persistir no Supabase.</template>
+            <template #content>
+              <div class="grid grid-cols-12 gap-3">
+                <div class="col-span-12 md:col-span-6">
+                  <label for="company-name" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-surface-500">Nome fantasia</label>
+                  <InputText id="company-name" v-model="form.name" fluid />
+                </div>
+                <div class="col-span-12 md:col-span-6">
+                  <label for="company-legal-name" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-surface-500">Razão social</label>
+                  <InputText id="company-legal-name" v-model="form.legalName" fluid />
+                </div>
+                <div class="col-span-12 md:col-span-4">
+                  <label for="company-tax-id" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-surface-500">CNPJ</label>
+                  <InputMask id="company-tax-id" v-model="form.taxId" mask="99.999.999/9999-99" fluid />
+                </div>
+                <div class="col-span-12 md:col-span-5">
+                  <label for="company-segment" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-surface-500">Segmento</label>
+                  <Select id="company-segment" v-model="form.segment" :options="segmentOptions" option-label="label" option-value="value" editable fluid />
+                </div>
+                <div class="col-span-12 md:col-span-3">
+                  <label for="company-active" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-surface-500">Status</label>
+                  <div class="flex h-10 items-center gap-3">
+                    <ToggleSwitch input-id="company-active" v-model="form.active" />
+                    <Tag :value="form.active ? 'Ativa' : 'Inativa'" :severity="form.active ? 'success' : 'secondary'" />
+                  </div>
+                </div>
+                <div class="col-span-12 md:col-span-4">
+                  <label for="company-responsible" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-surface-500">Responsável</label>
+                  <InputText id="company-responsible" v-model="form.responsible" fluid />
+                </div>
+                <div class="col-span-12 md:col-span-4">
+                  <label for="company-email" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-surface-500">E-mail</label>
+                  <InputText id="company-email" v-model="form.email" type="email" fluid />
+                </div>
+                <div class="col-span-12 md:col-span-2">
+                  <label for="company-phone" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-surface-500">Telefone</label>
+                  <InputText id="company-phone" v-model="form.phone" fluid />
+                </div>
+                <div class="col-span-12 md:col-span-2">
+                  <label for="company-whatsapp" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-surface-500">WhatsApp</label>
+                  <InputText id="company-whatsapp" v-model="form.whatsapp" fluid />
+                </div>
+                <div class="col-span-12 md:col-span-3">
+                  <label for="company-zip-code" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-surface-500">CEP</label>
+                  <InputMask id="company-zip-code" v-model="form.zipCode" mask="99999-999" fluid />
+                </div>
+                <div class="col-span-12 md:col-span-6">
+                  <label for="company-address" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-surface-500">Endereço</label>
+                  <InputText id="company-address" v-model="form.address" fluid />
+                </div>
+                <div class="col-span-12 md:col-span-3">
+                  <label for="company-number" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-surface-500">Número</label>
+                  <InputText id="company-number" v-model="form.number" fluid />
+                </div>
+                <div class="col-span-12 md:col-span-4">
+                  <label for="company-complement" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-surface-500">Complemento</label>
+                  <InputText id="company-complement" v-model="form.complement" fluid />
+                </div>
+                <div class="col-span-12 md:col-span-3">
+                  <label for="company-district" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-surface-500">Bairro</label>
+                  <InputText id="company-district" v-model="form.district" fluid />
+                </div>
+                <div class="col-span-12 md:col-span-3">
+                  <label for="company-city" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-surface-500">Cidade</label>
+                  <InputText id="company-city" v-model="form.city" fluid />
+                </div>
+                <div class="col-span-12 md:col-span-2">
+                  <label for="company-state" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-surface-500">UF</label>
+                  <Select id="company-state" v-model="form.state" :options="stateOptions" option-label="label" option-value="value" fluid />
+                </div>
+                <div class="col-span-12 md:col-span-4">
+                  <label for="company-municipal-registration" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-surface-500">
+                    Inscrição municipal
+                  </label>
+                  <InputText id="company-municipal-registration" v-model="form.municipalRegistration" fluid />
+                </div>
+                <div class="col-span-12 md:col-span-4">
+                  <label for="company-state-registration" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-surface-500">
+                    Inscrição estadual
+                  </label>
+                  <InputText id="company-state-registration" v-model="form.stateRegistration" fluid />
+                </div>
+                <div class="col-span-12 md:col-span-4">
+                  <label for="company-business-hours" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-surface-500">
+                    Horário de atendimento
+                  </label>
+                  <InputText id="company-business-hours" v-model="form.businessHours" fluid />
+                </div>
+                <div class="col-span-12">
+                  <label for="company-notes" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-surface-500">Observações internas</label>
+                  <Textarea id="company-notes" v-model="form.notes" rows="3" fluid />
+                </div>
+              </div>
+            </template>
+          </Card>
+        </form>
+      </template>
     </PageContent>
-
-    <!-- Dialog: Editar empresa -->
-    <Dialog v-model:visible="empresaDrawerOpen" modal header="Editar empresa" class="!w-[480px] !max-w-[96vw]" :draggable="false">
-      <form class="space-y-4" @submit.prevent="saveEmpresa">
-        <div class="flex flex-col gap-1.5">
-          <label class="text-xs font-semibold uppercase tracking-wide text-surface-500">Nome da empresa</label>
-          <InputText v-model="empresaForm.nome" fluid />
-        </div>
-        <div class="flex flex-col gap-1.5">
-          <label class="text-xs font-semibold uppercase tracking-wide text-surface-500">CNPJ</label>
-          <InputText v-model="empresaForm.cnpj" fluid />
-        </div>
-      </form>
-      <template #footer>
-        <div class="flex gap-2 pt-1">
-          <Button label="Cancelar" severity="secondary" outlined fluid @click="empresaDrawerOpen = false" />
-          <Button label="Salvar" fluid @click="saveEmpresa" />
-        </div>
-      </template>
-    </Dialog>
-
-    <!-- Dialog: Convidar membro -->
-    <Dialog v-model:visible="inviteDrawerOpen" modal header="Convidar membro" class="!w-[480px] !max-w-[96vw]" :draggable="false">
-      <form class="space-y-4" @submit.prevent="saveInvite">
-        <div class="flex flex-col gap-1.5">
-          <label class="text-xs font-semibold uppercase tracking-wide text-surface-500">E-mail</label>
-          <InputText v-model="inviteEmail" type="email" placeholder="colaborador@email.com" fluid />
-        </div>
-        <div class="flex flex-col gap-1.5">
-          <label class="text-xs font-semibold uppercase tracking-wide text-surface-500">Papel</label>
-          <Select v-model="inviteRole" :options="roleOptions" fluid />
-        </div>
-        <Message severity="info" size="small" variant="simple">
-          O convidado receberá um e-mail para criar sua senha.
-        </Message>
-      </form>
-      <template #footer>
-        <div class="flex gap-2 pt-1">
-          <Button label="Cancelar" severity="secondary" outlined fluid @click="inviteDrawerOpen = false" />
-          <Button label="Enviar convite" fluid @click="saveInvite" />
-        </div>
-      </template>
-    </Dialog>
   </div>
 </template>

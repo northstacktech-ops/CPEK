@@ -1,40 +1,90 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import AppBreadcrumb from '../../components/layout/AppBreadcrumb.vue'
 import PageHeader from '../../components/layout/PageHeader.vue'
 import PageContent from '../../components/layout/PageContent.vue'
+import { useCompanyStore } from '../../stores/company'
+
+interface BankAccount {
+  id?: string
+  bankAccountId?: string
+  name: string
+  balance?: number
+  openingBalance?: number | string
+}
+
+const company = useCompanyStore()
+const { api } = useApi()
 
 const drawerOpen = ref(false)
-const editingId = ref<string | null>(null)
-const form = ref({ nome: '', tipo: 'Recebimento', banco: '', agencia: '', saldoInicial: null as number | null })
-const tipoOptions = ['Recebimento', 'Caixa', 'Cartão', 'Cortesia']
-const statusSeverity: Record<string, string> = { Ativo: 'success', Inativo: 'secondary' }
+const loading = ref(false)
+const saving = ref(false)
+const error = ref<string | null>(null)
+const form = ref({ name: '', openingBalance: null as number | null })
+const items = ref<BankAccount[]>([])
 
-const items = ref([
-  { id: '1', nome: 'Boleto Itaú', tipo: 'Recebimento', banco: 'Itaú', agencia: '0341', saldoInicial: 0, status: 'Ativo' },
-  { id: '2', nome: 'Caixa Loja', tipo: 'Caixa', banco: '—', agencia: '—', saldoInicial: 500, status: 'Ativo' },
-  { id: '3', nome: 'Cartão Créd./Déb.', tipo: 'Cartão', banco: 'Cielo', agencia: '—', saldoInicial: 0, status: 'Ativo' },
-  { id: '4', nome: 'Conta Cortesia', tipo: 'Cortesia', banco: '—', agencia: '—', saldoInicial: 0, status: 'Ativo' },
-])
+const orderedItems = computed(() => [...items.value].sort((a, b) => a.name.localeCompare(b.name)))
 
-const brl = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+function brl(value: number) {
+  return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+}
 
-function openNew() { editingId.value = null; form.value = { nome: '', tipo: 'Recebimento', banco: '', agencia: '', saldoInicial: null }; drawerOpen.value = true }
-function openEdit(row: typeof items.value[0]) { editingId.value = row.id; form.value = { nome: row.nome, tipo: row.tipo, banco: row.banco, agencia: row.agencia, saldoInicial: row.saldoInicial }; drawerOpen.value = true }
-function save() {
-  if (editingId.value) {
-    const idx = items.value.findIndex(i => i.id === editingId.value)
-    if (idx !== -1) items.value[idx] = { ...items.value[idx], ...form.value }
-  } else {
-    items.value.unshift({ id: String(Date.now()), nome: form.value.nome, tipo: form.value.tipo, banco: form.value.banco, agencia: form.value.agencia, saldoInicial: form.value.saldoInicial ?? 0, status: 'Ativo' })
+function accountId(account: BankAccount) {
+  return account.bankAccountId ?? account.id ?? account.name
+}
+
+function accountBalance(account: BankAccount) {
+  return Number(account.balance ?? account.openingBalance ?? 0)
+}
+
+async function loadItems() {
+  if (!company.activeId) return
+  loading.value = true
+  error.value = null
+  try {
+    const response = await api<{ items: BankAccount[] }>('/api/bank-accounts', { query: { companyId: company.activeId } })
+    items.value = response.items
+  } catch {
+    error.value = 'Não foi possível carregar as contas.'
+  } finally {
+    loading.value = false
   }
-  drawerOpen.value = false
 }
-function deleteItem(id: string) {
-  if (!window.confirm('Excluir?')) return
-  const idx = items.value.findIndex(i => i.id === id)
-  if (idx !== -1) items.value.splice(idx, 1)
+
+function openNew() {
+  form.value = { name: '', openingBalance: null }
+  drawerOpen.value = true
 }
+
+async function save() {
+  if (!company.activeId || saving.value) return
+  saving.value = true
+  error.value = null
+  try {
+    const response = await api<{ item: BankAccount }>('/api/bank-accounts', {
+      method: 'POST',
+      body: {
+        companyId: company.activeId,
+        name: form.value.name,
+        openingBalance: form.value.openingBalance ?? 0,
+      },
+    })
+    items.value = [response.item, ...items.value]
+    drawerOpen.value = false
+  } catch {
+    error.value = 'Não foi possível salvar a conta.'
+  } finally {
+    saving.value = false
+  }
+}
+
+watch(() => company.activeId, () => {
+  void loadItems()
+})
+
+onMounted(() => {
+  void loadItems()
+})
 </script>
 
 <template>
@@ -47,58 +97,43 @@ function deleteItem(id: string) {
         <Button icon="pi pi-plus" label="Nova conta" size="small" @click="openNew" />
       </template>
     </PageHeader>
+
     <PageContent>
+      <Message v-if="error" severity="error" size="small" class="col-span-12">{{ error }}</Message>
+
       <div class="col-span-12">
-        <DataTable :value="items" data-key="id" size="small" class="cpek-table">
-          <Column field="nome" header="Nome" sortable />
-          <Column field="tipo" header="Tipo" style="width:10rem">
-            <template #body="{ data }"><Tag :value="data.tipo" severity="secondary" /></template>
+        <TableSkeleton v-if="loading" :rows="6" :columns="4" />
+
+        <DataTable v-else :value="orderedItems" :data-key="accountId" size="small" class="cpek-table">
+          <Column field="name" header="Nome" sortable />
+          <Column field="balance" header="Saldo atual" style="width:12rem">
+            <template #body="{ data }"><span class="tabular-nums font-semibold">{{ brl(accountBalance(data)) }}</span></template>
           </Column>
-          <Column field="banco" header="Banco" style="width:9rem" />
-          <Column field="agencia" header="Agência" style="width:8rem" />
-          <Column field="saldoInicial" header="Saldo inicial" style="width:10rem">
-            <template #body="{ data }"><span class="tabular-nums font-semibold">{{ brl(data.saldoInicial) }}</span></template>
+          <Column header="Status" style="width:8rem">
+            <template #body><Tag value="Ativa" severity="success" /></template>
           </Column>
-          <Column field="status" header="Status" style="width:8rem">
-            <template #body="{ data }"><Tag :value="data.status" :severity="statusSeverity[data.status]" /></template>
-          </Column>
-          <Column header="" style="width:5rem" body-class="text-right">
-            <template #body="{ data }">
-              <Button icon="pi pi-pencil" text rounded size="small" severity="secondary" @click="openEdit(data)" />
-            </template>
-          </Column>
+          <template #empty>
+            <div class="py-8 text-center text-sm text-surface-400">Nenhuma conta bancária encontrada.</div>
+          </template>
         </DataTable>
       </div>
     </PageContent>
-    <Dialog v-model:visible="drawerOpen" modal :header="editingId ? 'Editar conta' : 'Nova conta bancária'" class="!w-[480px] !max-w-[96vw]" :draggable="false">
+
+    <Dialog v-model:visible="drawerOpen" modal header="Nova conta bancária" class="!w-[480px] !max-w-[96vw]" :draggable="false">
       <form class="space-y-4" @submit.prevent="save">
         <div class="flex flex-col gap-1.5">
           <label class="text-xs font-semibold uppercase tracking-wide text-surface-500">Nome</label>
-          <InputText v-model="form.nome" fluid />
-        </div>
-        <div class="flex flex-col gap-1.5">
-          <label class="text-xs font-semibold uppercase tracking-wide text-surface-500">Tipo</label>
-          <Select v-model="form.tipo" :options="tipoOptions" fluid />
-        </div>
-        <div class="grid grid-cols-2 gap-3">
-          <div class="flex flex-col gap-1.5">
-            <label class="text-xs font-semibold uppercase tracking-wide text-surface-500">Banco</label>
-            <InputText v-model="form.banco" fluid />
-          </div>
-          <div class="flex flex-col gap-1.5">
-            <label class="text-xs font-semibold uppercase tracking-wide text-surface-500">Agência</label>
-            <InputText v-model="form.agencia" fluid />
-          </div>
+          <InputText v-model="form.name" fluid />
         </div>
         <div class="flex flex-col gap-1.5">
           <label class="text-xs font-semibold uppercase tracking-wide text-surface-500">Saldo inicial</label>
-          <InputNumber v-model="form.saldoInicial" mode="currency" currency="BRL" locale="pt-BR" fluid />
+          <InputNumber v-model="form.openingBalance" mode="currency" currency="BRL" locale="pt-BR" fluid />
         </div>
       </form>
       <template #footer>
         <div class="flex gap-2 pt-1">
           <Button label="Cancelar" severity="secondary" outlined fluid @click="drawerOpen = false" />
-          <Button label="Salvar" fluid @click="save" />
+          <Button label="Salvar" :loading="saving" fluid @click="save" />
         </div>
       </template>
     </Dialog>

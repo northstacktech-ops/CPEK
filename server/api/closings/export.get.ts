@@ -1,10 +1,34 @@
-// GET /api/closings/export?...&format=csv — export CSV (inclui snapshot + Unidade) (§3, §8).
-import { requireAuth, validateQuery, notImplemented } from '../../utils/http'
+import { demoClosings, isDemoAuth } from '../../utils/demo'
+import { requireAuth, validateQuery } from '../../utils/http'
+import { withTenant } from '../../utils/withTenant'
 import { listClosingsQuery } from '../../utils/validators/closings'
 
 export default defineEventHandler(async (event) => {
-  requireAuth(event)
-  validateQuery(event, listClosingsQuery)
-  // TODO(§8): withTenant → stream CSV via server/utils/csv.ts.
-  return notImplemented('§8')
+  const auth = requireAuth(event)
+  const query = validateQuery(event, listClosingsQuery)
+  const rows = isDemoAuth(auth)
+    ? demoClosings
+    : await withTenant(auth.tenantId, (tx) =>
+        tx.closing.findMany({
+          where: { companyId: query.companyId, ...(query.periodId ? { periodId: query.periodId } : {}) },
+          orderBy: { createdAt: 'desc' },
+        }),
+      )
+
+  setResponseHeader(event, 'content-type', 'text/csv; charset=utf-8')
+  setResponseHeader(event, 'content-disposition', 'attachment; filename="fechamentos.csv"')
+  const header = ['id', 'cliente', 'valor', 'vencimento', 'recebimento', 'status']
+  const body = rows.map((row: any) =>
+    [
+      row.id,
+      row.cliente ?? row.contactId ?? '',
+      row.valor ?? row.valorFechamento ?? '',
+      row.vencimento ?? row.dataVencPrev?.toISOString?.() ?? '',
+      row.recebimento ?? row.dataRecebimento?.toISOString?.() ?? '',
+      row.status ?? row.statusId ?? '',
+    ]
+      .map((value) => `"${String(value).replaceAll('"', '""')}"`)
+      .join(','),
+  )
+  return [header.join(','), ...body].join('\n')
 })

@@ -1,11 +1,23 @@
-// DELETE /api/custom-fields/:id — remover definição (histórico íntegro via cache) §6.
-import { requireAuth, notImplemented } from '../../utils/http'
+import { isDemoAuth } from '../../utils/demo'
+import { writeAudit } from '../../utils/audit'
+import { apiError, requireAuth } from '../../utils/http'
+import { withTenant } from '../../utils/withTenant'
 
 export default defineEventHandler(async (event) => {
-  requireAuth(event)
-  const _id = getRouterParam(event, 'id')
-  // TODO(§6): remover afeta só lançamentos futuros; snapshots antigos usam _label/_type;
-  //   writeAudit('CUSTOM_FIELD_REMOVE').
-  void _id
-  return notImplemented('§6')
+  const auth = requireAuth(event)
+  const id = getRouterParam(event, 'id')
+  if (!id) throw apiError(400, 'MISSING_ID', 'Id obrigatorio')
+  if (isDemoAuth(auth)) return { ok: true }
+
+  return withTenant(auth.tenantId, async (tx) => {
+    await tx.customField.update({ where: { id }, data: { active: false } })
+    await writeAudit(tx, {
+      tenantId: auth.tenantId,
+      userId: auth.userId,
+      action: 'CUSTOM_FIELD_REMOVE',
+      entity: 'CustomField',
+      entityId: id,
+    })
+    return { ok: true }
+  })
 })

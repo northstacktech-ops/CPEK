@@ -7,6 +7,25 @@ export interface CompanyRef {
   id: string
   name: string
   segment?: string | null
+  active?: boolean
+  updatedAt?: string | null
+  legalName?: string | null
+  taxId?: string | null
+  responsible?: string | null
+  email?: string | null
+  phone?: string | null
+  whatsapp?: string | null
+  zipCode?: string | null
+  address?: string | null
+  number?: string | null
+  complement?: string | null
+  district?: string | null
+  city?: string | null
+  state?: string | null
+  municipalRegistration?: string | null
+  stateRegistration?: string | null
+  businessHours?: string | null
+  notes?: string | null
 }
 
 export const useCompanyStore = defineStore('company', {

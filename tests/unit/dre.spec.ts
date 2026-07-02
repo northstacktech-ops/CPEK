@@ -8,7 +8,8 @@ describe('DRE — fórmulas básicas (§7.1)', () => {
   })
 
   it('Margem % = Margem ÷ Receita Op (0 quando receita = 0)', () => {
-    const { marginPct } = { marginPct: 1000 === 0 ? 0 : 600 / 1000 }
+    const receita: number = 1000
+    const marginPct = receita === 0 ? 0 : 600 / receita
     expect(marginPct).toBeCloseTo(0.6, 4)
   })
 

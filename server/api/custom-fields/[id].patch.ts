@@ -1,12 +1,27 @@
-// PATCH /api/custom-fields/:id — editar definição (PROPAGA ao histórico) (ARCHITECTURE §6).
-import { requireAuth, validateBody, notImplemented } from '../../utils/http'
+import { isDemoAuth } from '../../utils/demo'
+import { writeAudit } from '../../utils/audit'
+import { apiError, requireAuth, validateBody } from '../../utils/http'
+import { withTenant } from '../../utils/withTenant'
 import { updateCustomFieldBody } from '../../utils/validators/customFields'
 
 export default defineEventHandler(async (event) => {
-  requireAuth(event)
-  const _id = getRouterParam(event, 'id')
-  await validateBody(event, updateCustomFieldBody) // exige confirm: true
-  // TODO(§6): editar label/tipo reflete na leitura do histórico; writeAudit('CUSTOM_FIELD_EDIT').
-  void _id
-  return notImplemented('§6')
+  const auth = requireAuth(event)
+  const id = getRouterParam(event, 'id')
+  if (!id) throw apiError(400, 'MISSING_ID', 'Id obrigatorio')
+  const body = await validateBody(event, updateCustomFieldBody)
+  if (isDemoAuth(auth)) return { item: { id, ...body } }
+
+  const { confirm, ...data } = body
+  void confirm
+  return withTenant(auth.tenantId, async (tx) => {
+    const item = await tx.customField.update({ where: { id }, data })
+    await writeAudit(tx, {
+      tenantId: auth.tenantId,
+      userId: auth.userId,
+      action: 'CUSTOM_FIELD_EDIT',
+      entity: 'CustomField',
+      entityId: id,
+    })
+    return { item }
+  })
 })

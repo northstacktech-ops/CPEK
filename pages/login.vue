@@ -102,10 +102,9 @@ async function onDemoAccess() {
 
         <Button
           type="button"
-          label="Acessar demo"
+          label="Acesso teste"
           icon="pi pi-play"
-          severity="secondary"
-          outlined
+          severity="success"
           :loading="loadingDemo"
           fluid
           @click="onDemoAccess"

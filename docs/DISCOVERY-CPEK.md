@@ -59,12 +59,16 @@ para, na V2, virar SaaS licenciável às ~200 unidades da rede.
 | 5 | Cadastros | Catálogos, centros de custo, taxas, contas, campos custom | Web | 5h | 7h | 12h |
 | 6 | Contatos | Clientes e fornecedores | Web | 1h | 2h | 3h |
 | 7 | Fechamento de período | Abrir, fechar e reabrir período (trava + auditoria) | Web | 1.5h | 2h | 3.5h |
-| 8 | Configurações | Conta, empresas, membros, auditoria | Web | 3h | 4h | 7h |
+| 8 | Configurações | Conta, empresas, auditoria | Web | 3h | 4h | 7h |
 | — | Shell / contexto | Sidebar, troca de empresa, seletor de período | Web | 1.5h | 2.5h | 4h |
 | | **Total previsto** | | | **27.5h** | **41.5h** | **69h** |
 
 > ⚠️ **Risco de estouro:** comparar com as horas contratadas (a confirmar). Caso o
-> contratado seja inferior a ~69h, repriorizar (ex.: adiar Auditoria e Membros para um round posterior).
+> contratado seja inferior a ~69h, repriorizar (ex.: adiar Auditoria para um round posterior).
+
+> **Atualização (2026-07-06):** decidido acesso único por conta (sem convite de múltiplos
+> membros). Escopo de "Membros" (telas 8.3/8.3.1) removido do produto; "Auditoria" (8.4)
+> mantida como log interno de ações sensíveis.
 
 ### 2.1 Decisões pendentes que afetam telas (ver ARCHITECTURE §19)
 - **D1 — 5º card do dashboard:** default **"Vencidos"** (confirmar vs "A Receber").
@@ -82,7 +86,7 @@ para, na V2, virar SaaS licenciável às ~200 unidades da rede.
 | R2 | Cadastros (catálogos, centros, taxas, contas, campos custom) | Pendente |
 | R3 | Lançamentos (entradas/saídas/fechamentos) + Contatos | Pendente |
 | R4 | Fechamento de período + DRE (realizado×agendado, export) | Pendente |
-| R5 | Configurações (conta, empresas, membros, auditoria) + revisão | Pendente |
+| R5 | Configurações (conta, empresas, auditoria) + revisão | Pendente |
 
 ---
 
@@ -663,13 +667,10 @@ Link "Cancelar"
 O que o módulo precisa fazer para ser considerado operante?
   Admin edita dados da conta e gerencia empresas
   Criar empresa aplica o template de franquia automaticamente ¹
-  Admin convida membros e define papel (admin / member) ²
-  Convite grava os claims de tenant/papel no usuário ²
   Log de auditoria lista ações sensíveis com autor, data e detalhe ³
 
 ### Notificações
 Quais ações desse módulo geram notificações, e para quem?
-  E-mail de convite ao novo membro (com acesso à conta)
   Ações sensíveis registram auditoria ³
 
 ### Telas
@@ -679,7 +680,6 @@ Título: "Configurações"
 Lista de atalhos
   Atalho "Conta" → 8.1
   Atalho "Empresas" → 8.2
-  Atalho "Membros" → 8.3
   Atalho "Auditoria" → 8.4
 
 **[8.1] Conta (0.5h)**
@@ -707,24 +707,7 @@ Aviso de que o template cria catálogos, centros de custo e campos padrão
 Botão "Criar empresa"
 Link "Cancelar"
 
-**[8.3] Membros (0.75h)**
-Título: "Membros"
-Botão "Convidar membro" → 8.3.1
-Tabela de membros
-  Coluna: Nome
-  Coluna: E-mail
-  Coluna: Papel (Admin / Member) ²
-  Coluna: Status (ativo / inativo)
-  Coluna: Ações (alterar papel / ativar ou desativar)
-Estado vazio quando há só o admin
-
-**[8.3.1] Convidar membro (0.5h)**
-Título: "Convidar membro"
-Campo: "E-mail"
-Campo: "Nome"
-Seletor de papel (Admin / Member) ²
-Botão "Enviar convite"
-Link "Cancelar"
+**[8.3] Membros — removido do escopo (acesso único por conta, decisão 2026-07-06)**
 
 **[8.4] Auditoria (0.5h)**
 Título: "Auditoria"
@@ -741,13 +724,11 @@ Estado vazio quando não há eventos
 
 ### Anotações p/ UI e dev
 ¹ Criar empresa aplica o template de seed (idempotente): serviços, categorias com dreGroup, status, formas de pagamento, centros de custo e campos padrão
-² Dois papéis no MVP (admin/member); ACL por formulário fica como gancho (D6). Convite grava app_metadata { account_id, role } no usuário
-³ AuditLog cobre: fechar/reabrir período, excluir lançamento, alterar campo personalizado, gerenciar membro
+³ AuditLog cobre: fechar/reabrir período, excluir lançamento, alterar campo personalizado
 
 ### Fluxo visual
 [8] → [8.1]
 [8] → [8.2] → [8.2.1]
-[8] → [8.3] → [8.3.1]
 [8] → [8.4]
 
 ---

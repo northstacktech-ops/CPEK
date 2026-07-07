@@ -363,7 +363,7 @@ Filtros: período (mês/ano), tipo de lançamento, empresa ativa.
 - [ ] **Cliente Prisma base proibido em `server/api/**`** (lint/teste de arquitetura) — §4.3.
 - [ ] Validação de payload no servidor (zod) em toda rota.
 - [ ] HTTPS; segredos só em env da Vercel / `.env.local`; `service_role` só no servidor.
-- [ ] `AuditLog` em: fechar/reabrir período, excluir lançamento, alterar campo custom, gerenciar membro.
+- [ ] `AuditLog` em: fechar/reabrir período, excluir lançamento, alterar campo custom.
 - [ ] Período fechado → 409 no servidor.
 - [ ] **Teste de isolamento RLS em matriz** verde no CI (gate de merge) — §15.
 
@@ -475,7 +475,7 @@ Sair de 1:1 para N:N depois **mexe em auth e em todas as queries**, então a dec
 - **DoD:** DRE bate com lançamentos; período fechado bloqueia edição; export nos dois formatos.
 
 ### Fase 4 — Configurações + polimento
-- [ ] Conta, empresas, membros (convite + papel), auditoria.
+- [ ] Conta, empresas, auditoria. (Membros removido do escopo — acesso único por conta, decisão 2026-07-06.)
 - [ ] Estados de erro/loading/vazio em todas as telas; acessibilidade.
 - **DoD:** MVP completo, navegável, auditado.
 

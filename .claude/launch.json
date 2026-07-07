@@ -3,8 +3,8 @@
   "configurations": [
     {
       "name": "cpek-dev",
-      "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["dev"],
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["nuxt", "dev"],
       "port": 3000
     }
   ]

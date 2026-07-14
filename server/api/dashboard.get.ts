@@ -5,7 +5,15 @@ import { dashboardQuery } from '../utils/validators/dashboard'
 
 function emptyDashboard(year: number) {
   return {
-    cards: { faturamentoBruto: 0, despesas: 0, lucroReal: 0, ticketMedio: 0, vencidos: 0 },
+    cards: {
+      faturamentoBruto: 0,
+      despesas: 0,
+      lucroReal: 0,
+      ticketMedio: 0,
+      vencidos: 0,
+      royalties: null as number | null,
+      impostoNf: null as number | null,
+    },
     accounts: [],
     consolidatedBalance: 0,
     cashFlow: Array.from({ length: 12 }, (_, index) => ({
@@ -34,13 +42,17 @@ export default defineEventHandler(async (event) => {
 
       if (!period) return emptyDashboard(year)
 
-      const [entries, exits, closings, accounts] = await Promise.all([
+      const [entries, exits, closings, accounts, company] = await Promise.all([
         tx.entry.findMany({ where: { companyId: query.companyId, periodId: period.id } }),
         tx.exit.findMany({ where: { companyId: query.companyId, periodId: period.id } }),
         tx.closing.findMany({ where: { companyId: query.companyId, periodId: period.id } }),
         tx.bankAccount.findMany({
           where: { companyId: query.companyId, active: true },
           orderBy: { name: 'asc' },
+        }),
+        tx.company.findUnique({
+          where: { id: query.companyId },
+          select: { royaltiesPercent: true, impostoNfPercent: true },
         }),
       ])
 
@@ -52,6 +64,14 @@ export default defineEventHandler(async (event) => {
     const despesas = exits.reduce((total, item) => total + Number(item.valorDespesa), 0)
     const lucroReal = faturamentoBruto - despesas
     const ticketMedio = entries.length ? faturamentoEntradas / entries.length : 0
+    // Cards fiscais (configuráveis em /configuracoes): null = percentual não configurado.
+    const royaltiesPercent = company?.royaltiesPercent != null ? Number(company.royaltiesPercent) : null
+    const impostoNfPercent = company?.impostoNfPercent != null ? Number(company.impostoNfPercent) : null
+    const royalties = royaltiesPercent != null ? (faturamentoBruto * royaltiesPercent) / 100 : null
+    const faturamentoComNf = entries
+      .filter((item) => item.notaFiscal)
+      .reduce((total, item) => total + Number(item.valorServico) + Number(item.deslocamento), 0)
+    const impostoNf = impostoNfPercent != null ? (faturamentoComNf * impostoNfPercent) / 100 : null
     const today = new Date()
     const vencidos =
       exits
@@ -80,7 +100,7 @@ export default defineEventHandler(async (event) => {
     })
 
       return {
-        cards: { faturamentoBruto, despesas, lucroReal, ticketMedio, vencidos },
+        cards: { faturamentoBruto, despesas, lucroReal, ticketMedio, vencidos, royalties, impostoNf },
         accounts: accountBalances,
         consolidatedBalance: accountBalances.reduce((total, item) => total + item.balance, 0),
         cashFlow: emptyFlow.map((point, index) => ({

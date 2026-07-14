@@ -147,6 +147,11 @@ model Company {
   businessHours         String? @map("business_hours")
   notes                 String?
 
+  // Percentuais fiscais configuráveis pelo franqueado (usados no dashboard):
+  // royalties pagos à franqueadora e imposto sobre notas fiscais emitidas.
+  royaltiesPercent Decimal? @map("royalties_percent") @db.Decimal(14, 4)
+  impostoNfPercent Decimal? @map("imposto_nf_percent") @db.Decimal(14, 4)
+
   account      Account        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   periods      Period[]
   customFields CustomField[]
@@ -318,6 +323,9 @@ model Entry {
 
   valorServico  Decimal   @map("valor_servico") @db.Decimal(14, 2)
   deslocamento  Decimal   @default(0) @db.Decimal(14, 2)
+  pesquisa      Decimal?  @db.Decimal(14, 2)
+  retorno       Decimal?  @db.Decimal(14, 2)
+  notaFiscal    Boolean   @default(false) @map("nota_fiscal") // emitiu NF → entra no cálculo de imposto do dashboard
   placa         String?
   modelo        String?
   dataServico   DateTime? @map("data_servico")

@@ -11,11 +11,13 @@ const expandedRows = ref<Record<string, boolean>>({})
 const meses = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
 const mesAtual = 5 // junho (0-indexed)
 
-// Mock DRE data
+// Mock DRE data — ordem pedida pelo Cleber (reunião 07/2026):
+// Faturamento − Despesas Fixas − Despesas Variáveis = Resultado Final,
+// com Margem de Contribuição e Margem (%) movidas para DEPOIS do resultado.
 const rows = [
   {
     id: 'receita-op',
-    label: 'Receita Operacional',
+    label: 'Faturamento (Receita Operacional)',
     indent: 0,
     bold: true,
     sign: 1,
@@ -27,22 +29,8 @@ const rows = [
     ],
   },
   {
-    id: 'custo-op',
-    label: '(−) Custo Operacional',
-    indent: 0,
-    bold: true,
-    sign: -1,
-    valores: [2400, 2600, 2900, 2750, 3100, 3100, 0, 0, 0, 0, 0, 0],
-    children: [
-      { id: 'km', label: 'Combustível / KM', indent: 1, sign: -1, valores: [1200, 1300, 1500, 1400, 1600, 1600, 0, 0, 0, 0, 0, 0] },
-      { id: 'manutencao', label: 'Manutenção veicular', indent: 1, sign: -1, valores: [1200, 1300, 1400, 1350, 1500, 1500, 0, 0, 0, 0, 0, 0] },
-    ],
-  },
-  { id: 'margem', label: '= Margem de Contribuição', indent: 0, bold: true, separator: true, sign: 1, valores: [12800, 14400, 16400, 15750, 16320, 16320, 0, 0, 0, 0, 0, 0] },
-  { id: 'margem-pct', label: 'Margem (%)', indent: 1, sign: 1, percent: true, valores: [84, 85, 85, 85, 84, 84, 0, 0, 0, 0, 0, 0] },
-  {
-    id: 'despesas-op',
-    label: '(−) Despesas Operacionais',
+    id: 'despesas-fixas',
+    label: '(−) Despesas Fixas',
     indent: 0,
     bold: true,
     sign: -1,
@@ -53,8 +41,24 @@ const rows = [
       { id: 'mkt', label: 'Marketing', indent: 1, sign: -1, valores: [1200, 1300, 1400, 1400, 1120, 1120, 0, 0, 0, 0, 0, 0] },
     ],
   },
-  { id: 'resultado-op', label: '= Resultado Operacional', indent: 0, bold: true, separator: true, sign: 1, valores: [1900, 2900, 3800, 3650, 3500, 3500, 0, 0, 0, 0, 0, 0] },
-  { id: 'variacao', label: '= Variação de Caixa', indent: 0, bold: true, highlight: true, sign: 1, valores: [1900, 2900, 3800, 3650, 3500, 3500, 0, 0, 0, 0, 0, 0] },
+  {
+    id: 'despesas-variaveis',
+    label: '(−) Despesas Variáveis',
+    indent: 0,
+    bold: true,
+    sign: -1,
+    valores: [2400, 2600, 2900, 2750, 3100, 3100, 0, 0, 0, 0, 0, 0],
+    children: [
+      { id: 'km', label: 'Combustível / KM', indent: 1, sign: -1, valores: [1200, 1300, 1500, 1400, 1600, 1600, 0, 0, 0, 0, 0, 0] },
+      { id: 'manutencao', label: 'Manutenção veicular', indent: 1, sign: -1, valores: [1200, 1300, 1400, 1350, 1500, 1500, 0, 0, 0, 0, 0, 0] },
+    ],
+  },
+  // Resultado = Faturamento − Fixas − Variáveis (15200−10900−2400=1900, ...)
+  { id: 'resultado-final', label: '= Resultado Final', indent: 0, bold: true, separator: true, highlight: true, sign: 1, valores: [1900, 2900, 3800, 3650, 3500, 3500, 0, 0, 0, 0, 0, 0] },
+  // Margens ao final, depois de todas as despesas (pedido do Cleber).
+  { id: 'margem', label: 'Margem de Contribuição', indent: 0, bold: true, separator: true, sign: 1, valores: [12800, 14400, 16400, 15750, 16320, 16320, 0, 0, 0, 0, 0, 0] },
+  { id: 'margem-pct', label: 'Margem de Contribuição (%)', indent: 1, sign: 1, percent: true, valores: [84, 85, 85, 85, 84, 84, 0, 0, 0, 0, 0, 0] },
+  { id: 'margem-liquida-pct', label: 'Margem Líquida (%)', indent: 1, sign: 1, percent: true, valores: [13, 17, 20, 20, 18, 18, 0, 0, 0, 0, 0, 0] },
 ]
 
 function toggleRow(id: string) {

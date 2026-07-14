@@ -26,6 +26,8 @@ export interface CompanyRef {
   stateRegistration?: string | null
   businessHours?: string | null
   notes?: string | null
+  royaltiesPercent?: number | string | null
+  impostoNfPercent?: number | string | null
 }
 
 export const useCompanyStore = defineStore('company', {

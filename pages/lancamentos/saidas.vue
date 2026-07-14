@@ -24,6 +24,8 @@ interface ExitRecord {
   valor?: number | string
   valorDespesa?: number | string
   descricao?: string | null
+  anotacoes?: string | null
+  documentoNf?: string | null
   dataLancamento?: string | null
   dataVencimento?: string | null
   dataPagamento?: string | null
@@ -31,6 +33,7 @@ interface ExitRecord {
   contactId?: string | null
   categoryId?: string | null
   costCenterId?: string | null
+  paymentId?: string | null
 }
 
 interface ExitRow {
@@ -64,12 +67,16 @@ const categories = ref<NamedOption[]>([])
 const suppliers = ref<NamedOption[]>([])
 const accounts = ref<NamedOption[]>([])
 const costCenters = ref<NamedOption[]>([])
+const payments = ref<NamedOption[]>([])
 
 const form = ref({
   valor: null as number | null,
   jaPago: false,
   dataPagamento: null as Date | null,
   descricao: '',
+  anotacoes: '',
+  documentoNf: '',
+  formaPagamento: null as string | null,
   categoria: null as string | null,
   conta: null as string | null,
   dataCompetencia: new Date() as Date | null,
@@ -84,6 +91,7 @@ const categoriaOptions = computed(() => categories.value.map(labelOf))
 const fornecedorOptions = computed(() => suppliers.value.map(labelOf))
 const contaOptions = computed(() => accounts.value.map(labelOf))
 const centroCustoOptions = computed(() => costCenters.value.map(labelOf))
+const pagamentoOptions = computed(() => payments.value.map(labelOf))
 const statusSeverity: Record<string, string> = { Pago: 'success', 'Em Aberto': 'info', Vencido: 'danger', Cancelado: 'secondary' }
 
 const filtered = computed(() => {
@@ -145,18 +153,20 @@ async function loadExits() {
   error.value = null
 
   try {
-    const [currentPeriod, categoryRes, supplierRes, accountRes, costCenterRes] = await Promise.all([
+    const [currentPeriod, categoryRes, supplierRes, accountRes, costCenterRes, paymentRes] = await Promise.all([
       ensure(company.activeId),
       api<{ items: NamedOption[] }>('/api/catalogs', { query: { companyId: company.activeId, kind: 'CATEGORY' } }),
       api<{ items: NamedOption[] }>('/api/contacts', { query: { companyId: company.activeId, type: 'SUPPLIER' } }),
       api<{ items: NamedOption[] }>('/api/bank-accounts', { query: { companyId: company.activeId } }),
       api<{ items: NamedOption[] }>('/api/cost-centers', { query: { companyId: company.activeId } }),
+      api<{ items: NamedOption[] }>('/api/catalogs', { query: { companyId: company.activeId, kind: 'PAYMENT_METHOD' } }),
     ])
 
     categories.value = categoryRes.items
     suppliers.value = supplierRes.items
     accounts.value = accountRes.items
     costCenters.value = costCenterRes.items
+    payments.value = paymentRes.items
 
     const response = await api<{ items: ExitRecord[] }>('/api/exits', {
       query: { companyId: company.activeId, periodId: currentPeriod.id },
@@ -175,6 +185,9 @@ function resetForm() {
     jaPago: false,
     dataPagamento: null,
     descricao: '',
+    anotacoes: '',
+    documentoNf: '',
+    formaPagamento: null,
     categoria: null,
     conta: null,
     dataCompetencia: new Date(),
@@ -198,6 +211,9 @@ function openEdit(row: ExitRow) {
     jaPago: Boolean(row.raw.dataPagamento) || row.status === 'Pago',
     dataPagamento: row.raw.dataPagamento ? new Date(row.raw.dataPagamento) : null,
     descricao: row.raw.descricao ?? '',
+    anotacoes: row.raw.anotacoes ?? '',
+    documentoNf: row.raw.documentoNf ?? '',
+    formaPagamento: labelById(payments.value, row.raw.paymentId) || null,
     categoria: row.categoria === 'Sem categoria' ? null : row.categoria,
     conta: labelById(accounts.value, row.raw.bankAccountId) || null,
     dataCompetencia: row.raw.dataLancamento ? new Date(row.raw.dataLancamento) : new Date(),
@@ -224,8 +240,11 @@ async function save() {
       contactId: optionIdByLabel(suppliers.value, form.value.fornecedor),
       costCenterId: optionIdByLabel(costCenters.value, form.value.centroCusto),
       categoryId: optionIdByLabel(categories.value, form.value.categoria),
+      paymentId: optionIdByLabel(payments.value, form.value.formaPagamento),
       valorDespesa: form.value.valor ?? 0,
       descricao: form.value.descricao || undefined,
+      anotacoes: form.value.anotacoes || undefined,
+      documentoNf: form.value.documentoNf || undefined,
       dataLancamento: form.value.dataCompetencia?.toISOString(),
       dataVencimento: form.value.dataVencimento?.toISOString(),
       dataPagamento: paidDate?.toISOString(),
@@ -278,7 +297,8 @@ async function deleteExit(id: string) {
 function exportCSV() {
   const rows = [['Data', 'Fornecedor', 'Categoria', 'C. Custo', 'Valor', 'Vencimento', 'Status']]
   filtered.value.forEach((exit) => rows.push([exit.data, exit.fornecedor, exit.categoria, exit.centroCusto, String(exit.valor), exit.vencimento, exit.status]))
-  const csv = rows.map((row) => row.map((cell) => `"${cell.replaceAll('"', '""')}"`).join(',')).join('\n')
+  // Excel pt-BR: separador ';', BOM UTF-8 e CRLF (senão abre tudo numa coluna).
+  const csv = '﻿' + rows.map((row) => row.map((cell) => `"${cell.replaceAll('"', '""')}"`).join(';')).join('\r\n')
   const anchor = document.createElement('a')
   anchor.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }))
   anchor.download = 'saídas.csv'
@@ -400,6 +420,14 @@ onMounted(() => {
           <label class="text-xs font-semibold uppercase tracking-wide text-surface-500">Status</label>
           <Select v-model="form.status" :options="statusOptions" fluid />
         </div>
+        <div class="flex flex-col gap-1.5">
+          <label class="text-xs font-semibold uppercase tracking-wide text-surface-500">Forma de pagamento</label>
+          <Select v-model="form.formaPagamento" :options="pagamentoOptions" placeholder="Selecione" show-clear fluid />
+        </div>
+        <div class="flex flex-col gap-1.5">
+          <label class="text-xs font-semibold uppercase tracking-wide text-surface-500">Documento (NF)</label>
+          <InputText v-model="form.documentoNf" placeholder="Nº da nota fiscal / documento" fluid />
+        </div>
         <div class="flex items-center gap-2 md:col-span-2">
           <Checkbox v-model="form.jaPago" binary input-id="ja-pago" />
           <label for="ja-pago" class="cursor-pointer text-sm">Já foi pago</label>
@@ -410,7 +438,11 @@ onMounted(() => {
         </div>
         <div class="flex flex-col gap-1.5 md:col-span-2">
           <label class="text-xs font-semibold uppercase tracking-wide text-surface-500">Descrição</label>
-          <Textarea v-model="form.descricao" rows="3" fluid />
+          <Textarea v-model="form.descricao" rows="2" placeholder="Descrição curta (ex.: 1kg de café)" fluid />
+        </div>
+        <div class="flex flex-col gap-1.5 md:col-span-2">
+          <label class="text-xs font-semibold uppercase tracking-wide text-surface-500">Anotações</label>
+          <Textarea v-model="form.anotacoes" rows="3" placeholder="Observações internas (opcional)" fluid />
         </div>
       </form>
       <template #footer>

@@ -5,9 +5,12 @@ import PageHeader from '../components/layout/PageHeader.vue'
 import PageContent from '../components/layout/PageContent.vue'
 import { useCompanyStore, type CompanyRef } from '../stores/company'
 
-type CompanyProfile = Required<Omit<CompanyRef, 'id' | 'updatedAt'>> & {
+type CompanyProfile = Required<Omit<CompanyRef, 'id' | 'updatedAt' | 'royaltiesPercent' | 'impostoNfPercent'>> & {
   id: string
   updatedAt: string | null
+  // Percentuais fiscais: null = não configurado (InputNumber trabalha com number|null).
+  royaltiesPercent: number | null
+  impostoNfPercent: number | null
 }
 
 const company = useCompanyStore()
@@ -42,6 +45,8 @@ const emptyProfile: CompanyProfile = {
   stateRegistration: '',
   businessHours: '',
   notes: '',
+  royaltiesPercent: null,
+  impostoNfPercent: null,
   updatedAt: null,
 }
 
@@ -136,11 +141,24 @@ const sections = computed(() => [
     items: [
       { label: 'Inscrição municipal', value: form.municipalRegistration },
       { label: 'Inscrição estadual', value: form.stateRegistration },
+      { label: 'Royalties (%)', value: asPercent(form.royaltiesPercent) },
+      { label: 'Imposto NF (%)', value: asPercent(form.impostoNfPercent) },
       { label: 'Horário de atendimento', value: form.businessHours },
       { label: 'Observações', value: form.notes },
     ],
   },
 ])
+
+function asPercent(value: number | null) {
+  if (value == null) return ''
+  return `${value.toLocaleString('pt-BR', { maximumFractionDigits: 2 })}%`
+}
+
+function asPercentNumber(value: number | string | null | undefined): number | null {
+  if (value == null || value === '') return null
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? parsed : null
+}
 
 function asText(value: unknown) {
   if (value == null || value === '') return '-'
@@ -173,6 +191,9 @@ function normalizeProfile(current: CompanyRef | null): CompanyProfile {
     stateRegistration: current?.stateRegistration ?? '',
     businessHours: current?.businessHours ?? '',
     notes: current?.notes ?? '',
+    // Decimal do Prisma chega como string no JSON — converter para number.
+    royaltiesPercent: asPercentNumber(current?.royaltiesPercent),
+    impostoNfPercent: asPercentNumber(current?.impostoNfPercent),
   }
 }
 
@@ -249,6 +270,9 @@ async function saveCompany() {
         stateRegistration: form.stateRegistration || null,
         businessHours: form.businessHours || null,
         notes: form.notes || null,
+        // ?? null (não || null): 0% é valor válido.
+        royaltiesPercent: form.royaltiesPercent ?? null,
+        impostoNfPercent: form.impostoNfPercent ?? null,
       },
     })
 
@@ -456,6 +480,42 @@ watch(
                     Horário de atendimento
                   </label>
                   <InputText id="company-business-hours" v-model="form.businessHours" fluid />
+                </div>
+                <div class="col-span-12 md:col-span-4">
+                  <label for="company-royalties" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-surface-500">
+                    Royalties (%)
+                  </label>
+                  <InputNumber
+                    id="company-royalties"
+                    v-model="form.royaltiesPercent"
+                    suffix="%"
+                    mode="decimal"
+                    :min="0"
+                    :max="100"
+                    :max-fraction-digits="2"
+                    locale="pt-BR"
+                    placeholder="Ex.: 11%"
+                    fluid
+                  />
+                  <p class="mt-1 text-xs text-surface-400">Percentual pago à franqueadora sobre o faturamento. Usado no dashboard.</p>
+                </div>
+                <div class="col-span-12 md:col-span-4">
+                  <label for="company-imposto-nf" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-surface-500">
+                    Imposto NF (%)
+                  </label>
+                  <InputNumber
+                    id="company-imposto-nf"
+                    v-model="form.impostoNfPercent"
+                    suffix="%"
+                    mode="decimal"
+                    :min="0"
+                    :max="100"
+                    :max-fraction-digits="2"
+                    locale="pt-BR"
+                    placeholder="Ex.: 6%"
+                    fluid
+                  />
+                  <p class="mt-1 text-xs text-surface-400">Percentual de imposto sobre entradas com nota fiscal emitida.</p>
                 </div>
                 <div class="col-span-12">
                   <label for="company-notes" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-surface-500">Observações internas</label>

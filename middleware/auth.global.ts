@@ -6,7 +6,8 @@ export default defineNuxtRouteMiddleware((to) => {
   const session = useSessionStore()
   const company = useCompanyStore()
   const period = usePeriodStore()
-  const isPublic = to.path === '/login'
+  const PUBLIC_PATHS = ['/login', '/definir-senha']
+  const isPublic = PUBLIC_PATHS.includes(to.path)
 
   if (import.meta.client && !session.isAuthenticated) {
     const savedDemo = localStorage.getItem('cpek.demo.session')
@@ -41,7 +42,10 @@ export default defineNuxtRouteMiddleware((to) => {
   if (!session.isAuthenticated && !isPublic) {
     return navigateTo('/login')
   }
-  if (session.isAuthenticated && isPublic) {
+  // /definir-senha nunca redireciona por conta da sessão do app — quem chega
+  // ali tem uma sessão de recuperação própria do Supabase, separada da sessão
+  // do app (session store), então "autenticado no app" não se aplica.
+  if (session.isAuthenticated && to.path === '/login') {
     return navigateTo('/')
   }
 })

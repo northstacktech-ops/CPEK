@@ -22,6 +22,7 @@ interface ClosingRecord {
   status?: string
   valorFechamento?: number | string
   descricao?: string | null
+  documentoNf?: string | null
   dataFechamento?: string | null
   dataVencPrev?: string | null
   dataRecebimento?: string | null
@@ -65,6 +66,7 @@ const form = ref({
   conta: null as string | null,
   categoria: null as string | null,
   descricao: '',
+  documentoNf: '',
   valor: null as number | null,
   fechamento: new Date() as Date | null,
   vencimento: new Date() as Date | null,
@@ -172,6 +174,7 @@ function resetForm() {
     conta: null,
     categoria: null,
     descricao: '',
+    documentoNf: '',
     valor: null,
     fechamento: new Date(),
     vencimento: new Date(),
@@ -193,6 +196,7 @@ function openEdit(row: ClosingRow) {
     conta: labelById(accounts.value, row.raw.bankAccountId) || null,
     categoria: labelById(categories.value, row.raw.categoryId) || null,
     descricao: row.raw.descricao ?? '',
+    documentoNf: row.raw.documentoNf ?? '',
     valor: row.valor,
     fechamento: row.raw.dataFechamento ? new Date(row.raw.dataFechamento) : new Date(),
     vencimento: row.raw.dataVencPrev ? new Date(row.raw.dataVencPrev) : new Date(),
@@ -219,6 +223,7 @@ async function save() {
       statusId: optionIdByLabel(statuses.value, form.value.status),
       valorFechamento: form.value.valor ?? 0,
       descricao: form.value.descricao || undefined,
+      documentoNf: form.value.documentoNf || undefined,
       dataFechamento: form.value.fechamento?.toISOString(),
       dataVencPrev: form.value.vencimento?.toISOString(),
       dataRecebimento: receivedDate?.toISOString(),
@@ -269,7 +274,8 @@ async function deleteClosing(id: string) {
 function exportCSV() {
   const rows = [['Cliente', 'Valor', 'Vencimento', 'Recebimento', 'Status']]
   filtered.value.forEach((closing) => rows.push([closing.cliente, String(closing.valor), closing.vencimento, closing.recebimento, closing.status]))
-  const csv = rows.map((row) => row.map((cell) => `"${cell.replaceAll('"', '""')}"`).join(',')).join('\n')
+  // Excel pt-BR: separador ';', BOM UTF-8 e CRLF (senão abre tudo numa coluna).
+  const csv = '﻿' + rows.map((row) => row.map((cell) => `"${cell.replaceAll('"', '""')}"`).join(';')).join('\r\n')
   const anchor = document.createElement('a')
   anchor.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }))
   anchor.download = 'fechamentos.csv'
@@ -389,6 +395,10 @@ onMounted(() => {
         <div class="flex flex-col gap-1.5">
           <label class="text-xs font-semibold uppercase tracking-wide text-surface-500">Status</label>
           <Select v-model="form.status" :options="statusOptions" fluid />
+        </div>
+        <div class="flex flex-col gap-1.5">
+          <label class="text-xs font-semibold uppercase tracking-wide text-surface-500">Documento (NF)</label>
+          <InputText v-model="form.documentoNf" placeholder="Nº da nota fiscal / documento" fluid />
         </div>
         <div class="flex flex-col gap-1.5 md:col-span-2">
           <label class="text-xs font-semibold uppercase tracking-wide text-surface-500">Descrição</label>

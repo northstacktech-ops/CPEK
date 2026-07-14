@@ -20,7 +20,7 @@ const dashboard = ref<DashboardData | null>(null)
 const reducedMotion = ref(false)
 
 const emptyDashboard = computed<DashboardData>(() => ({
-  cards: { faturamentoBruto: 0, despesas: 0, lucroReal: 0, ticketMedio: 0, vencidos: 0 },
+  cards: { faturamentoBruto: 0, despesas: 0, lucroReal: 0, ticketMedio: 0, vencidos: 0, royalties: null, impostoNf: null },
   accounts: [],
   consolidatedBalance: 0,
   cashFlow: Array.from({ length: 12 }, (_, index) => ({
@@ -71,6 +71,28 @@ const kpis = computed(() => {
     { label: 'Despesas', value: cards.despesas, reference: 'Saídas registradas', icon: 'pi pi-credit-card', severity: 'danger' },
     { label: 'Ticket Médio', value: cards.ticketMedio, reference: 'por entrada', icon: 'pi pi-shopping-cart', severity: 'secondary' },
     { label: 'Vencidos', value: cards.vencidos, reference: 'Pendências abertas', icon: 'pi pi-exclamation-triangle', severity: 'warn' },
+  ]
+})
+
+// 2ª linha — cards fiscais (Royalties/Imposto NF). value null = percentual não
+// configurado em /configuracoes: mostra hint em vez de R$ 0,00 enganoso.
+const fiscalKpis = computed(() => {
+  const cards = currentData.value.cards
+  return [
+    {
+      label: 'Royalties a Pagar',
+      value: cards.royalties,
+      reference: 'Percentual sobre o faturamento',
+      icon: 'pi pi-building-columns',
+      severity: 'warn',
+    },
+    {
+      label: 'Imposto NF',
+      value: cards.impostoNf,
+      reference: 'Sobre entradas com nota emitida',
+      icon: 'pi pi-file-check',
+      severity: 'info',
+    },
   ]
 })
 
@@ -221,6 +243,36 @@ const brl = (value: number) => value.toLocaleString('pt-BR', { style: 'currency'
               class="mt-1 block text-xs"
               :class="kpi.featured ? 'text-white/60' : 'text-surface-400'"
             >{{ kpi.reference }}</span>
+          </template>
+        </div>
+      </div>
+
+      <div class="col-span-12 grid grid-cols-1 gap-3 md:grid-cols-2">
+        <div
+          v-for="kpi in fiscalKpis"
+          :key="kpi.label"
+          class="rounded-xl border border-surface-200 bg-surface-0 p-4 dark:border-surface-800 dark:bg-surface-900"
+        >
+          <template v-if="loading">
+            <Skeleton width="5rem" height="0.75rem" class="mb-3" />
+            <Skeleton width="8rem" height="1.5rem" class="mb-2" />
+            <Skeleton width="4rem" height="0.75rem" />
+          </template>
+          <template v-else>
+            <div class="mb-3 flex items-center justify-between">
+              <span class="text-[10px] font-bold uppercase tracking-widest text-surface-400">{{ kpi.label }}</span>
+              <Tag :icon="kpi.icon" :severity="kpi.severity" rounded value="" :aria-label="kpi.label" size="small" />
+            </div>
+            <template v-if="kpi.value != null">
+              <strong class="block text-xl font-bold tabular-nums text-surface-900 dark:text-surface-0">{{ brl(kpi.value) }}</strong>
+              <span class="mt-1 block text-xs text-surface-400">{{ kpi.reference }}</span>
+            </template>
+            <template v-else>
+              <strong class="block text-xl font-bold text-surface-300 dark:text-surface-600">—</strong>
+              <NuxtLink to="/configuracoes" class="mt-1 block text-xs text-brand-600 hover:underline">
+                Configure o percentual em Configurações
+              </NuxtLink>
+            </template>
           </template>
         </div>
       </div>

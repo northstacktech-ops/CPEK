@@ -9,7 +9,7 @@ for (const envFile of ['.env.local', '.env']) {
 
 const TENANT_ID = process.env.CLEBER_TENANT_ID ?? '7b4e2f0f-8b64-4b5d-9d0c-5f1a8f0f2026'
 const COMPANY_ID = process.env.CLEBER_COMPANY_ID ?? '6f8a1a62-3437-44a6-a9f3-2f5570cc2026'
-const EMAIL = process.env.CLEBER_EMAIL ?? 'cleber.portoalegre@supervisao.com'
+const EMAIL = process.env.CLEBER_EMAIL ?? 'clebercpinto@icloud.com'
 const PASSWORD = process.env.CLEBER_PASSWORD
 const SUPABASE_URL = process.env.SUPABASE_URL ?? process.env.NUXT_PUBLIC_SUPABASE_URL
 const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.NUXT_SUPABASE_SERVICE_ROLE_KEY
@@ -36,7 +36,7 @@ async function findOrCreateUser() {
       email: EMAIL,
       password: PASSWORD,
       email_confirm: true,
-      user_metadata: { name: 'Cleber C.' },
+      user_metadata: { name: 'Cleber Carvalho Pinto' },
       app_metadata: { account_id: TENANT_ID, role: Role.ADMIN },
     })
     if (error) throw error
@@ -47,7 +47,7 @@ async function findOrCreateUser() {
     email: EMAIL,
     password: PASSWORD,
     email_confirm: true,
-    user_metadata: { name: 'Cleber C.' },
+    user_metadata: { name: 'Cleber Carvalho Pinto' },
     app_metadata: { account_id: TENANT_ID, role: Role.ADMIN },
   })
   if (error) throw error
@@ -77,7 +77,7 @@ async function upsertWithSupabaseRest(userId: string) {
       id: userId,
       tenant_id: TENANT_ID,
       email: EMAIL,
-      name: 'Cleber C.',
+      name: 'Cleber Carvalho Pinto',
       role: Role.ADMIN,
       active: true,
     },
@@ -87,8 +87,7 @@ async function upsertWithSupabaseRest(userId: string) {
 }
 
 async function main() {
-  const [{ hasCompanyProfileColumns }, { prismaBase }, { withTenant }] = await Promise.all([
-    import('../server/utils/companyProfile'),
+  const [{ prismaBase }, { withTenant }] = await Promise.all([
     import('../server/utils/prisma'),
     import('../server/utils/withTenant'),
   ])
@@ -97,8 +96,6 @@ async function main() {
 
     try {
       await withTenant(TENANT_ID, async (tx) => {
-        const hasProfile = await hasCompanyProfileColumns(tx)
-
         await tx.account.upsert({
           where: { id: TENANT_ID },
           update: { name: 'Supervisao Vistorias' },
@@ -107,40 +104,26 @@ async function main() {
 
         await tx.company.upsert({
           where: { id: COMPANY_ID },
-          update: hasProfile
-            ? {
-                name: 'Supervisao Vistorias Porto Alegre',
-                segment: 'Vistoria Cautelar',
-                active: true,
-                responsible: 'Cleber C.',
-                email: EMAIL,
-                city: 'Porto Alegre',
-                state: 'RS',
-              }
-            : {
-                name: 'Supervisao Vistorias Porto Alegre',
-                segment: 'Vistoria Cautelar',
-                active: true,
-              },
-          create: hasProfile
-            ? {
-                id: COMPANY_ID,
-                tenantId: TENANT_ID,
-                name: 'Supervisao Vistorias Porto Alegre',
-                segment: 'Vistoria Cautelar',
-                active: true,
-                responsible: 'Cleber C.',
-                email: EMAIL,
-                city: 'Porto Alegre',
-                state: 'RS',
-              }
-            : {
-                id: COMPANY_ID,
-                tenantId: TENANT_ID,
-                name: 'Supervisao Vistorias Porto Alegre',
-                segment: 'Vistoria Cautelar',
-                active: true,
-              },
+          update: {
+            name: 'Supervisao Vistorias Porto Alegre',
+            segment: 'Vistoria Cautelar',
+            active: true,
+            responsible: 'Cleber Carvalho Pinto',
+            email: EMAIL,
+            city: 'Porto Alegre',
+            state: 'RS',
+          },
+          create: {
+            id: COMPANY_ID,
+            tenantId: TENANT_ID,
+            name: 'Supervisao Vistorias Porto Alegre',
+            segment: 'Vistoria Cautelar',
+            active: true,
+            responsible: 'Cleber Carvalho Pinto',
+            email: EMAIL,
+            city: 'Porto Alegre',
+            state: 'RS',
+          },
           select: { id: true },
         })
 
@@ -149,7 +132,7 @@ async function main() {
           update: {
             tenantId: TENANT_ID,
             email: EMAIL,
-            name: 'Cleber C.',
+            name: 'Cleber Carvalho Pinto',
             role: Role.ADMIN,
             active: true,
           },
@@ -157,7 +140,7 @@ async function main() {
             id: user.id,
             tenantId: TENANT_ID,
             email: EMAIL,
-            name: 'Cleber C.',
+            name: 'Cleber Carvalho Pinto',
             role: Role.ADMIN,
             active: true,
           },

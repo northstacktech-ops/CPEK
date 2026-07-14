@@ -1,3 +1,4 @@
+import { toCsv } from '../../utils/csv'
 import { demoClosings, isDemoAuth } from '../../utils/demo'
 import { requireAuth, validateQuery } from '../../utils/http'
 import { withTenant } from '../../utils/withTenant'
@@ -17,18 +18,16 @@ export default defineEventHandler(async (event) => {
 
   setResponseHeader(event, 'content-type', 'text/csv; charset=utf-8')
   setResponseHeader(event, 'content-disposition', 'attachment; filename="fechamentos.csv"')
-  const header = ['id', 'cliente', 'valor', 'vencimento', 'recebimento', 'status']
-  const body = rows.map((row: any) =>
-    [
-      row.id,
-      row.cliente ?? row.contactId ?? '',
-      row.valor ?? row.valorFechamento ?? '',
-      row.vencimento ?? row.dataVencPrev?.toISOString?.() ?? '',
-      row.recebimento ?? row.dataRecebimento?.toISOString?.() ?? '',
-      row.status ?? row.statusId ?? '',
-    ]
-      .map((value) => `"${String(value).replaceAll('"', '""')}"`)
-      .join(','),
+  const columns = ['id', 'cliente', 'valor', 'vencimento', 'recebimento', 'status']
+  return toCsv(
+    rows.map((row: any) => ({
+      id: row.id,
+      cliente: row.cliente ?? row.contactId ?? '',
+      valor: row.valor ?? row.valorFechamento ?? '',
+      vencimento: row.vencimento ?? row.dataVencPrev?.toISOString?.() ?? '',
+      recebimento: row.recebimento ?? row.dataRecebimento?.toISOString?.() ?? '',
+      status: row.status ?? row.statusId ?? '',
+    })),
+    columns,
   )
-  return [header.join(','), ...body].join('\n')
 })

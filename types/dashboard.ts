@@ -6,6 +6,9 @@ export interface DashboardCards {
   ticketMedio: number
   // 5º card — default "Vencidos" (D1, §19). TODO(decisão): confirmar vs "A Receber".
   vencidos: number
+  // Cards fiscais (2ª linha): null = percentual não configurado em /configuracoes.
+  royalties: number | null
+  impostoNf: number | null
 }
 
 export interface BankAccountBalance {

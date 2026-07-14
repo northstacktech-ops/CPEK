@@ -33,14 +33,21 @@ interface EntryRecord {
   valor?: number | string
   valorServico?: number | string
   deslocamento?: number | string
+  pesquisa?: number | string | null
+  retorno?: number | string | null
+  notaFiscal?: boolean
+  placa?: string | null
+  modelo?: string | null
   dataServico?: string | null
   dataPagamento?: string | null
   bankAccountId?: string | null
   contactId?: string | null
   serviceId?: string | null
   categoryId?: string | null
+  paymentId?: string | null
   statusId?: string | null
   feeProfileId?: string | null
+  documentoNf?: string | null
   anotacoes?: string | null
 }
 
@@ -71,6 +78,7 @@ const editingId = ref<string | null>(null)
 const services = ref<CatalogOption[]>([])
 const categories = ref<CatalogOption[]>([])
 const statuses = ref<CatalogOption[]>([])
+const payments = ref<CatalogOption[]>([])
 const accounts = ref<AccountOption[]>([])
 const clients = ref<ContactOption[]>([])
 const entries = ref<EntryRow[]>([])
@@ -87,6 +95,13 @@ const form = ref({
   taxa: null as string | null,
   servico: null as string | null,
   deslocamento: null as number | null,
+  pesquisa: null as number | null,
+  retorno: null as number | null,
+  notaFiscal: false,
+  placa: '',
+  modelo: '',
+  formaPagamento: null as string | null,
+  documentoNf: '',
   status: 'Em Aberto',
 })
 
@@ -94,6 +109,7 @@ const fallbackStatusOptions = ['Em Aberto', 'Pago', 'Vencido', 'Cancelado']
 const statusOptions = computed(() => unique([...statuses.value.map((item) => item.label), ...fallbackStatusOptions]))
 const servicoOptions = computed(() => services.value.map((item) => item.label))
 const categoriaOptions = computed(() => categories.value.map((item) => item.label))
+const pagamentoOptions = computed(() => payments.value.map((item) => item.label))
 const contaOptions = computed(() => accounts.value.map((item) => item.name))
 const clienteOptions = computed(() => clients.value.map((item) => item.name))
 
@@ -165,11 +181,12 @@ async function loadEntries() {
   error.value = null
 
   try {
-    const [currentPeriod, serviceRes, categoryRes, statusRes, accountRes, clientRes] = await Promise.all([
+    const [currentPeriod, serviceRes, categoryRes, statusRes, paymentRes, accountRes, clientRes] = await Promise.all([
       ensure(company.activeId),
       api<{ items: CatalogOption[] }>('/api/catalogs', { query: { companyId: company.activeId, kind: 'SERVICE' } }),
       api<{ items: CatalogOption[] }>('/api/catalogs', { query: { companyId: company.activeId, kind: 'CATEGORY' } }),
       api<{ items: CatalogOption[] }>('/api/catalogs', { query: { companyId: company.activeId, kind: 'STATUS' } }),
+      api<{ items: CatalogOption[] }>('/api/catalogs', { query: { companyId: company.activeId, kind: 'PAYMENT_METHOD' } }),
       api<{ items: AccountOption[] }>('/api/bank-accounts', { query: { companyId: company.activeId } }),
       api<{ items: ContactOption[] }>('/api/contacts', { query: { companyId: company.activeId, type: 'CLIENT' } }),
     ])
@@ -177,6 +194,7 @@ async function loadEntries() {
     services.value = serviceRes.items
     categories.value = categoryRes.items
     statuses.value = statusRes.items
+    payments.value = paymentRes.items
     accounts.value = accountRes.items
     clients.value = clientRes.items
 
@@ -204,6 +222,13 @@ function resetForm() {
     taxa: null,
     servico: null,
     deslocamento: null,
+    pesquisa: null,
+    retorno: null,
+    notaFiscal: false,
+    placa: '',
+    modelo: '',
+    formaPagamento: null,
+    documentoNf: '',
     status: 'Em Aberto',
   }
 }
@@ -228,6 +253,13 @@ function openEdit(row: EntryRow) {
     taxa: null,
     servico: row.servico === 'Sem serviço' ? null : row.servico,
     deslocamento: row.deslocamento,
+    pesquisa: row.raw.pesquisa != null ? Number(row.raw.pesquisa) : null,
+    retorno: row.raw.retorno != null ? Number(row.raw.retorno) : null,
+    notaFiscal: Boolean(row.raw.notaFiscal),
+    placa: row.raw.placa ?? '',
+    modelo: row.raw.modelo ?? '',
+    formaPagamento: labelById(payments.value, row.raw.paymentId) || null,
+    documentoNf: row.raw.documentoNf ?? '',
     status: row.status,
   }
   drawerOpen.value = true
@@ -249,8 +281,15 @@ async function saveEntry() {
       serviceId: optionIdByLabel(services.value, form.value.servico),
       categoryId: optionIdByLabel(categories.value, form.value.categoria),
       statusId: optionIdByLabel(statuses.value, form.value.status),
+      paymentId: optionIdByLabel(payments.value, form.value.formaPagamento),
       valorServico: form.value.valor ?? 0,
       deslocamento: form.value.deslocamento ?? 0,
+      pesquisa: form.value.pesquisa ?? undefined,
+      retorno: form.value.retorno ?? undefined,
+      notaFiscal: form.value.notaFiscal,
+      placa: form.value.placa || undefined,
+      modelo: form.value.modelo || undefined,
+      documentoNf: form.value.documentoNf || undefined,
       dataServico: form.value.dataCompetencia?.toISOString(),
       dataPagamento: receivedDate?.toISOString(),
       anotacoes: form.value.descricao || undefined,
@@ -302,7 +341,8 @@ async function deleteEntry(id: string) {
 function exportCSV() {
   const rows = [['Data', 'Cliente', 'Serviço', 'Valor', 'Deslocamento', 'Status']]
   filtered.value.forEach((entry) => rows.push([entry.data, entry.cliente, entry.servico, String(entry.valor), String(entry.deslocamento), entry.status]))
-  const csv = rows.map((row) => row.map((cell) => `"${cell.replaceAll('"', '""')}"`).join(',')).join('\n')
+  // Excel pt-BR: separador ';', BOM UTF-8 e CRLF (senão abre tudo numa coluna).
+  const csv = '﻿' + rows.map((row) => row.map((cell) => `"${cell.replaceAll('"', '""')}"`).join(';')).join('\r\n')
   const anchor = document.createElement('a')
   anchor.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }))
   anchor.download = 'entradas.csv'
@@ -446,6 +486,34 @@ onMounted(() => {
         <div class="flex flex-col gap-1.5">
           <label class="text-xs font-semibold uppercase tracking-wide text-surface-500">Status</label>
           <Select v-model="form.status" :options="statusOptions" fluid />
+        </div>
+        <div class="flex flex-col gap-1.5">
+          <label class="text-xs font-semibold uppercase tracking-wide text-surface-500">Placa</label>
+          <InputText v-model="form.placa" placeholder="ABC-1D23" fluid />
+        </div>
+        <div class="flex flex-col gap-1.5">
+          <label class="text-xs font-semibold uppercase tracking-wide text-surface-500">Modelo</label>
+          <InputText v-model="form.modelo" placeholder="Modelo do veículo" fluid />
+        </div>
+        <div class="flex flex-col gap-1.5">
+          <label class="text-xs font-semibold uppercase tracking-wide text-surface-500">Forma de pagamento</label>
+          <Select v-model="form.formaPagamento" :options="pagamentoOptions" placeholder="Selecione" show-clear fluid />
+        </div>
+        <div class="flex flex-col gap-1.5">
+          <label class="text-xs font-semibold uppercase tracking-wide text-surface-500">Documento (NF)</label>
+          <InputText v-model="form.documentoNf" placeholder="Nº da nota fiscal / documento" fluid />
+        </div>
+        <div class="flex flex-col gap-1.5">
+          <label class="text-xs font-semibold uppercase tracking-wide text-surface-500">Pesquisa</label>
+          <InputNumber v-model="form.pesquisa" mode="currency" currency="BRL" locale="pt-BR" fluid />
+        </div>
+        <div class="flex flex-col gap-1.5">
+          <label class="text-xs font-semibold uppercase tracking-wide text-surface-500">Retorno</label>
+          <InputNumber v-model="form.retorno" mode="currency" currency="BRL" locale="pt-BR" fluid />
+        </div>
+        <div class="flex items-center gap-2 md:col-span-2">
+          <Checkbox v-model="form.notaFiscal" binary input-id="nota-fiscal" />
+          <label for="nota-fiscal" class="cursor-pointer text-sm">Nota fiscal emitida (entra no cálculo de imposto)</label>
         </div>
         <div class="flex items-center gap-2 md:col-span-2">
           <Checkbox v-model="form.jaRecebido" binary input-id="ja-recebido" />

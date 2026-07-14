@@ -3,6 +3,10 @@ import {
   DEMO_CATEGORY_RECEITA_ID,
   DEMO_COMPANY_RJ_ID,
   DEMO_COMPANY_SP_ID,
+  DEMO_PAYMENT_BOLETO_ID,
+  DEMO_PAYMENT_CARTAO_ID,
+  DEMO_PAYMENT_DINHEIRO_ID,
+  DEMO_PAYMENT_PIX_ID,
   DEMO_SERVICE_CAUTELAR_ID,
   DEMO_SERVICE_CERTICAR_ID,
   DEMO_STATUS_ABERTO_ID,
@@ -21,6 +25,10 @@ const demoCatalogs = [
     { id: DEMO_STATUS_ABERTO_ID, companyId, kind: 'STATUS', label: 'Em Aberto', active: true, order: 2 },
     { id: DEMO_CATEGORY_RECEITA_ID, companyId, kind: 'CATEGORY', label: 'Receita Bruta', dreGroup: 'OPERATING_REVENUE', active: true, order: 1 },
     { id: DEMO_CATEGORY_DESPESA_ID, companyId, kind: 'CATEGORY', label: 'Despesas Operacionais', dreGroup: 'OPERATING_EXPENSE', active: true, order: 2 },
+    { id: DEMO_PAYMENT_PIX_ID, companyId, kind: 'PAYMENT_METHOD', label: 'PIX', active: true, order: 1 },
+    { id: DEMO_PAYMENT_DINHEIRO_ID, companyId, kind: 'PAYMENT_METHOD', label: 'Dinheiro', active: true, order: 2 },
+    { id: DEMO_PAYMENT_CARTAO_ID, companyId, kind: 'PAYMENT_METHOD', label: 'Cartão de Crédito', active: true, order: 3 },
+    { id: DEMO_PAYMENT_BOLETO_ID, companyId, kind: 'PAYMENT_METHOD', label: 'Boleto', active: true, order: 4 },
   ]),
 ]
 

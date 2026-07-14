@@ -23,6 +23,10 @@ export const DEMO_CATEGORY_DESPESA_ID = '00000000-0000-0000-0000-000000000802'
 export const DEMO_COST_FIXED_ID = '00000000-0000-0000-0000-000000000901'
 export const DEMO_COST_VARIABLE_ID = '00000000-0000-0000-0000-000000000902'
 export const DEMO_FEE_DEFAULT_ID = '00000000-0000-0000-0000-000000001001'
+export const DEMO_PAYMENT_PIX_ID = '00000000-0000-0000-0000-000000001101'
+export const DEMO_PAYMENT_DINHEIRO_ID = '00000000-0000-0000-0000-000000001102'
+export const DEMO_PAYMENT_CARTAO_ID = '00000000-0000-0000-0000-000000001103'
+export const DEMO_PAYMENT_BOLETO_ID = '00000000-0000-0000-0000-000000001104'
 
 export function isDemoToken(token: string | null | undefined): boolean {
   return token === DEMO_ACCESS_TOKEN
@@ -64,6 +68,8 @@ export const demoCompanies = [
     stateRegistration: 'Isento',
     businessHours: 'Segunda a sexta, 08h às 18h',
     notes: 'Dados demonstrativos isolados do acesso real.',
+    royaltiesPercent: 11,
+    impostoNfPercent: 6,
     updatedAt: null,
   },
   {
@@ -88,6 +94,8 @@ export const demoCompanies = [
     stateRegistration: 'Isento',
     businessHours: 'Segunda a sexta, 08h às 18h',
     notes: 'Dados demonstrativos isolados do acesso real.',
+    royaltiesPercent: 11,
+    impostoNfPercent: 6,
     updatedAt: null,
   },
 ]
@@ -111,6 +119,8 @@ export const demoDashboard = {
     lucroReal: 27600,
     ticketMedio: 3088.75,
     vencidos: 13910,
+    royalties: 5436.2, // 11% do faturamento bruto (percentual demo)
+    impostoNf: 1729.7, // 6% sobre entradas com NF emitida (percentual demo)
   },
   accounts: demoBankAccounts.map(({ bankAccountId, name, balance }) => ({ bankAccountId, name, balance })),
   consolidatedBalance: 114320.55,

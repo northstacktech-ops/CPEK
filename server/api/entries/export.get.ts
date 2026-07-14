@@ -1,3 +1,4 @@
+import { toCsv } from '../../utils/csv'
 import { demoEntries, isDemoAuth } from '../../utils/demo'
 import { requireAuth, validateQuery } from '../../utils/http'
 import { withTenant } from '../../utils/withTenant'
@@ -17,19 +18,23 @@ export default defineEventHandler(async (event) => {
 
   setResponseHeader(event, 'content-type', 'text/csv; charset=utf-8')
   setResponseHeader(event, 'content-disposition', 'attachment; filename="entradas.csv"')
-  const header = ['id', 'data', 'cliente', 'servico', 'valor', 'deslocamento', 'status']
-  const body = rows.map((row: any) =>
-    [
-      row.id,
-      row.data ?? row.dataServico?.toISOString?.() ?? '',
-      row.cliente ?? row.contactId ?? '',
-      row.servico ?? row.serviceId ?? '',
-      row.valor ?? row.valorServico ?? '',
-      row.deslocamento ?? '',
-      row.status ?? row.statusId ?? '',
-    ]
-      .map((value) => `"${String(value).replaceAll('"', '""')}"`)
-      .join(','),
+  const columns = ['id', 'data', 'cliente', 'servico', 'valor', 'deslocamento', 'pesquisa', 'retorno', 'notaFiscal', 'placa', 'modelo', 'documentoNf', 'status']
+  return toCsv(
+    rows.map((row: any) => ({
+      id: row.id,
+      data: row.data ?? row.dataServico?.toISOString?.() ?? '',
+      cliente: row.cliente ?? row.contactId ?? '',
+      servico: row.servico ?? row.serviceId ?? '',
+      valor: row.valor ?? row.valorServico ?? '',
+      deslocamento: row.deslocamento ?? '',
+      pesquisa: row.pesquisa ?? '',
+      retorno: row.retorno ?? '',
+      notaFiscal: row.notaFiscal ? 'Sim' : 'Não',
+      placa: row.placa ?? '',
+      modelo: row.modelo ?? '',
+      documentoNf: row.documentoNf ?? '',
+      status: row.status ?? row.statusId ?? '',
+    })),
+    columns,
   )
-  return [header.join(','), ...body].join('\n')
 })

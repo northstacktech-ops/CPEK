@@ -30,4 +30,6 @@ export const updateCompanyBody = z.object({
   stateRegistration: z.string().max(80).nullable().optional(),
   businessHours: z.string().max(160).nullable().optional(),
   notes: z.string().max(2000).nullable().optional(),
+  royaltiesPercent: z.number().min(0).max(100).nullable().optional(),
+  impostoNfPercent: z.number().min(0).max(100).nullable().optional(),
 })

@@ -1,3 +1,4 @@
+import { toCsv } from '../../utils/csv'
 import { buildDre } from '../../utils/dre'
 import { isDemoAuth } from '../../utils/demo'
 import { requireAuth, validateQuery } from '../../utils/http'
@@ -20,7 +21,8 @@ export default defineEventHandler(async (event) => {
 
   setResponseHeader(event, 'content-type', 'text/csv; charset=utf-8')
   setResponseHeader(event, 'content-disposition', 'attachment; filename="dre.csv"')
-  const header = ['companyId', 'year', 'mode', 'lineCount']
-  const row = [report.companyId, report.year, report.mode, report.lines.length]
-  return [header.join(','), row.map((value) => `"${String(value).replaceAll('"', '""')}"`).join(',')].join('\n')
+  return toCsv(
+    [{ companyId: report.companyId, year: report.year, mode: report.mode, lineCount: report.lines.length }],
+    ['companyId', 'year', 'mode', 'lineCount'],
+  )
 })

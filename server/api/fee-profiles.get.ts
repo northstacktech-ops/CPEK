@@ -1,11 +1,7 @@
-import { DEMO_FEE_DEFAULT_ID, isDemoAuth } from '../utils/demo'
+import { demoFeeProfiles, isDemoAuth } from '../utils/demo'
 import { requireAuth, validateQuery } from '../utils/http'
 import { withTenant } from '../utils/withTenant'
 import { listFeeProfilesQuery } from '../utils/validators/feeProfiles'
-
-const demoFeeProfiles = [
-  { id: DEMO_FEE_DEFAULT_ID, label: 'Padrao Boleto', feeType: 'PERCENTAGE', value: 2, active: true },
-]
 
 export default defineEventHandler(async (event) => {
   const auth = requireAuth(event)

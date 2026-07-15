@@ -1,36 +1,7 @@
-import {
-  DEMO_CATEGORY_DESPESA_ID,
-  DEMO_CATEGORY_RECEITA_ID,
-  DEMO_COMPANY_RJ_ID,
-  DEMO_COMPANY_SP_ID,
-  DEMO_PAYMENT_BOLETO_ID,
-  DEMO_PAYMENT_CARTAO_ID,
-  DEMO_PAYMENT_DINHEIRO_ID,
-  DEMO_PAYMENT_PIX_ID,
-  DEMO_SERVICE_CAUTELAR_ID,
-  DEMO_SERVICE_CERTICAR_ID,
-  DEMO_STATUS_ABERTO_ID,
-  DEMO_STATUS_PAGO_ID,
-  isDemoAuth,
-} from '../utils/demo'
+import { demoCatalogs, isDemoAuth } from '../utils/demo'
 import { requireAuth, validateQuery } from '../utils/http'
 import { withTenant } from '../utils/withTenant'
 import { listCatalogsQuery } from '../utils/validators/catalogs'
-
-const demoCatalogs = [
-  ...[DEMO_COMPANY_SP_ID, DEMO_COMPANY_RJ_ID].flatMap((companyId) => [
-    { id: DEMO_SERVICE_CAUTELAR_ID, companyId, kind: 'SERVICE', label: 'Cautelar', active: true, order: 1 },
-    { id: DEMO_SERVICE_CERTICAR_ID, companyId, kind: 'SERVICE', label: 'Certicar', active: true, order: 2 },
-    { id: DEMO_STATUS_PAGO_ID, companyId, kind: 'STATUS', label: 'Pago', active: true, order: 1 },
-    { id: DEMO_STATUS_ABERTO_ID, companyId, kind: 'STATUS', label: 'Em Aberto', active: true, order: 2 },
-    { id: DEMO_CATEGORY_RECEITA_ID, companyId, kind: 'CATEGORY', label: 'Receita Bruta', dreGroup: 'OPERATING_REVENUE', active: true, order: 1 },
-    { id: DEMO_CATEGORY_DESPESA_ID, companyId, kind: 'CATEGORY', label: 'Despesas Operacionais', dreGroup: 'OPERATING_EXPENSE', active: true, order: 2 },
-    { id: DEMO_PAYMENT_PIX_ID, companyId, kind: 'PAYMENT_METHOD', label: 'PIX', active: true, order: 1 },
-    { id: DEMO_PAYMENT_DINHEIRO_ID, companyId, kind: 'PAYMENT_METHOD', label: 'Dinheiro', active: true, order: 2 },
-    { id: DEMO_PAYMENT_CARTAO_ID, companyId, kind: 'PAYMENT_METHOD', label: 'Cartão de Crédito', active: true, order: 3 },
-    { id: DEMO_PAYMENT_BOLETO_ID, companyId, kind: 'PAYMENT_METHOD', label: 'Boleto', active: true, order: 4 },
-  ]),
-]
 
 export default defineEventHandler(async (event) => {
   const auth = requireAuth(event)

@@ -1,4 +1,4 @@
-import { isDemoAuth } from '../utils/demo'
+import { demoExits, isDemoAuth } from '../utils/demo'
 import type { Prisma } from '@prisma/client'
 import { buildCustomSnapshot } from '../utils/customFields'
 import { periodClosedError, requireAuth, validateBody } from '../utils/http'
@@ -8,7 +8,11 @@ import { createExitBody } from '../utils/validators/exits'
 export default defineEventHandler(async (event) => {
   const auth = requireAuth(event)
   const body = await validateBody(event, createExitBody)
-  if (isDemoAuth(auth)) return { item: { id: `demo-exit-${Date.now()}`, ...body } }
+  if (isDemoAuth(auth)) {
+    const item = { id: `demo-exit-${Date.now()}`, ...body }
+    demoExits.unshift(item)
+    return { item }
+  }
 
   return withTenant(auth.tenantId, async (tx) => {
     const period = await tx.period.findUnique({ where: { id: body.periodId } })

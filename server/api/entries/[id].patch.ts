@@ -1,4 +1,4 @@
-import { isDemoAuth } from '../../utils/demo'
+import { demoEntries, isDemoAuth } from '../../utils/demo'
 import { apiError, periodClosedError, requireAuth, validateBody } from '../../utils/http'
 import { withTenant } from '../../utils/withTenant'
 import { updateEntryBody } from '../../utils/validators/entries'
@@ -8,7 +8,13 @@ export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id')
   if (!id) throw apiError(400, 'MISSING_ID', 'Id obrigatorio')
   const body = await validateBody(event, updateEntryBody)
-  if (isDemoAuth(auth)) return { item: { id, ...body } }
+  if (isDemoAuth(auth)) {
+    const idx = demoEntries.findIndex((e) => e.id === id)
+    if (idx === -1) throw apiError(404, 'NOT_FOUND', 'Entrada não encontrada')
+    const item = { ...demoEntries[idx], ...body, id }
+    demoEntries[idx] = item
+    return { item }
+  }
 
   return withTenant(auth.tenantId, async (tx) => {
     const current = await tx.entry.findUnique({ where: { id }, include: { period: true } })

@@ -1,4 +1,4 @@
-import { isDemoAuth } from '../utils/demo'
+import { demoCustomFields, isDemoAuth } from '../utils/demo'
 import { requireAuth, validateBody } from '../utils/http'
 import { writeAudit } from '../utils/audit'
 import { withTenant } from '../utils/withTenant'
@@ -7,7 +7,11 @@ import { createCustomFieldBody } from '../utils/validators/customFields'
 export default defineEventHandler(async (event) => {
   const auth = requireAuth(event)
   const body = await validateBody(event, createCustomFieldBody)
-  if (isDemoAuth(auth)) return { item: { id: `demo-field-${Date.now()}`, active: true, ...body } }
+  if (isDemoAuth(auth)) {
+    const item = { id: `demo-field-${Date.now()}`, active: true, ...body }
+    demoCustomFields.push(item)
+    return { item }
+  }
 
   return withTenant(auth.tenantId, async (tx) => {
     const item = await tx.customField.create({

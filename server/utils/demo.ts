@@ -1,5 +1,10 @@
 import type { AuthContext } from './jwt'
 
+// Registros demo aceitam tanto os campos de exibição legados (cliente, valor,
+// status...) quanto os campos reais de schema (contactId, valorServico...),
+// já que o front normaliza os dois formatos — ver normalizeEntry() nas páginas.
+export type DemoRecord = Record<string, unknown> & { id: string }
+
 export const DEMO_ACCESS_TOKEN = 'demo-access-token'
 export const DEMO_TENANT_ID = '00000000-0000-0000-0000-000000000001'
 export const DEMO_USER_ID = '00000000-0000-0000-0000-000000000101'
@@ -140,17 +145,51 @@ export const demoDashboard = {
   ],
 }
 
-export const demoEntries = [
+export const demoCatalogs = [
+  ...[DEMO_COMPANY_SP_ID, DEMO_COMPANY_RJ_ID].flatMap((companyId) => [
+    { id: DEMO_SERVICE_CAUTELAR_ID, companyId, kind: 'SERVICE', label: 'Cautelar', active: true, order: 1 },
+    { id: DEMO_SERVICE_CERTICAR_ID, companyId, kind: 'SERVICE', label: 'Certicar', active: true, order: 2 },
+    { id: DEMO_STATUS_PAGO_ID, companyId, kind: 'STATUS', label: 'Pago', active: true, order: 1 },
+    { id: DEMO_STATUS_ABERTO_ID, companyId, kind: 'STATUS', label: 'Em Aberto', active: true, order: 2 },
+    { id: DEMO_CATEGORY_RECEITA_ID, companyId, kind: 'CATEGORY', label: 'Receita Bruta', dreGroup: 'OPERATING_REVENUE', active: true, order: 1 },
+    { id: DEMO_CATEGORY_DESPESA_ID, companyId, kind: 'CATEGORY', label: 'Despesas Operacionais', dreGroup: 'OPERATING_EXPENSE', active: true, order: 2 },
+    { id: DEMO_PAYMENT_PIX_ID, companyId, kind: 'PAYMENT_METHOD', label: 'PIX', active: true, order: 1 },
+    { id: DEMO_PAYMENT_DINHEIRO_ID, companyId, kind: 'PAYMENT_METHOD', label: 'Dinheiro', active: true, order: 2 },
+    { id: DEMO_PAYMENT_CARTAO_ID, companyId, kind: 'PAYMENT_METHOD', label: 'Cartão de Crédito', active: true, order: 3 },
+    { id: DEMO_PAYMENT_BOLETO_ID, companyId, kind: 'PAYMENT_METHOD', label: 'Boleto', active: true, order: 4 },
+  ]),
+]
+
+export const demoCostCenters = [
+  { id: DEMO_COST_FIXED_ID, label: 'Fixo', costType: 'FIXED', active: true },
+  { id: DEMO_COST_VARIABLE_ID, label: 'Variável', costType: 'VARIABLE', active: true },
+]
+
+export const demoFeeProfiles = [
+  { id: DEMO_FEE_DEFAULT_ID, label: 'Padrao Boleto', feeType: 'PERCENTAGE', value: 2, active: true },
+]
+
+export const demoContacts: DemoRecord[] = [
+  { id: DEMO_CONTACT_CLIENT_ID, type: 'CLIENT', name: 'Marcos Andrade', phone: '(11) 98765-4321', email: 'marcos@email.com', taxId: '123.456.789-00', active: true },
+  { id: DEMO_CONTACT_SUPPLIER_ID, type: 'SUPPLIER', name: 'Posto Shell', phone: '(11) 2345-6789', email: 'shell@posto.com', taxId: '98.765.432/0001-11', active: true },
+]
+
+export const demoCustomFields = [
+  { id: 'demo-field-1', kind: 'ENTRY', fieldKey: 'placa', label: 'Placa do veiculo', dataType: 'TEXT', required: true, active: true, order: 1 },
+  { id: 'demo-field-2', kind: 'ENTRY', fieldKey: 'modelo', label: 'Modelo', dataType: 'TEXT', required: false, active: true, order: 2 },
+]
+
+export const demoEntries: DemoRecord[] = [
   { id: 'demo-entry-1', data: '10/06/2026', cliente: 'Marcos Andrade', servico: 'Cautelar', valor: 320, deslocamento: 45, status: 'Pago' },
   { id: 'demo-entry-2', data: '11/06/2026', cliente: 'Ana Lima', servico: 'Certicar', valor: 480, deslocamento: 60, status: 'Pago' },
   { id: 'demo-entry-3', data: '12/06/2026', cliente: 'Roberto Souza', servico: 'Constatação', valor: 280, deslocamento: 30, status: 'Em Aberto' },
 ]
 
-export const demoExits = [
+export const demoExits: DemoRecord[] = [
   { id: 'demo-exit-1', data: '02/06/2026', fornecedor: 'Posto Shell', categoria: 'Combustível', centroCusto: 'Variável', valor: 380, vencimento: '02/06/2026', status: 'Pago' },
   { id: 'demo-exit-2', data: '05/06/2026', fornecedor: 'Imobiliaria ABC', categoria: 'Aluguel', centroCusto: 'Fixo', valor: 3200, vencimento: '05/06/2026', status: 'Pago' },
 ]
 
-export const demoClosings = [
+export const demoClosings: DemoRecord[] = [
   { id: 'demo-closing-1', cliente: 'Juliana Costa', valor: 13910, vencimento: '30/06/2026', recebimento: '', status: 'Vencido' },
 ]

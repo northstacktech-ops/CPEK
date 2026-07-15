@@ -1,4 +1,4 @@
-import { isDemoAuth } from '../../utils/demo'
+import { demoClosings, isDemoAuth } from '../../utils/demo'
 import { apiError, periodClosedError, requireAuth, validateBody } from '../../utils/http'
 import { withTenant } from '../../utils/withTenant'
 import { updateClosingBody } from '../../utils/validators/closings'
@@ -8,7 +8,13 @@ export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id')
   if (!id) throw apiError(400, 'MISSING_ID', 'Id obrigatorio')
   const body = await validateBody(event, updateClosingBody)
-  if (isDemoAuth(auth)) return { item: { id, ...body } }
+  if (isDemoAuth(auth)) {
+    const idx = demoClosings.findIndex((c) => c.id === id)
+    if (idx === -1) throw apiError(404, 'NOT_FOUND', 'Fechamento não encontrado')
+    const item = { ...demoClosings[idx], ...body, id }
+    demoClosings[idx] = item
+    return { item }
+  }
 
   return withTenant(auth.tenantId, async (tx) => {
     const current = await tx.closing.findUnique({ where: { id }, include: { period: true } })

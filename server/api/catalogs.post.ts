@@ -1,4 +1,4 @@
-import { isDemoAuth } from '../utils/demo'
+import { demoCatalogs, isDemoAuth } from '../utils/demo'
 import { requireAuth, validateBody } from '../utils/http'
 import { withTenant } from '../utils/withTenant'
 import { createCatalogBody } from '../utils/validators/catalogs'
@@ -6,7 +6,11 @@ import { createCatalogBody } from '../utils/validators/catalogs'
 export default defineEventHandler(async (event) => {
   const auth = requireAuth(event)
   const body = await validateBody(event, createCatalogBody)
-  if (isDemoAuth(auth)) return { item: { id: `demo-catalog-${Date.now()}`, active: true, ...body } }
+  if (isDemoAuth(auth)) {
+    const item = { id: `demo-catalog-${Date.now()}`, active: true, ...body }
+    demoCatalogs.push(item)
+    return { item }
+  }
 
   return withTenant(auth.tenantId, async (tx) => {
     const item = await tx.catalogValue.create({

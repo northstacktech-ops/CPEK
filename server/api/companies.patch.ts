@@ -11,14 +11,8 @@ export default defineEventHandler(async (event) => {
   if (isDemoAuth(auth)) {
     const current = demoCompanies.find((item) => item.id === body.id)
     if (!current) throw apiError(404, 'COMPANY_NOT_FOUND', 'Empresa não encontrada')
-
-    return {
-      item: {
-        ...current,
-        ...body,
-        updatedAt: new Date().toISOString(),
-      },
-    }
+    Object.assign(current, body, { updatedAt: new Date().toISOString() })
+    return { item: current }
   }
 
   return await withTenant(auth.tenantId, async (tx) => {

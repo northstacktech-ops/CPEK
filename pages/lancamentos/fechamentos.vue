@@ -50,13 +50,14 @@ function openEdit(row: typeof closings.value[0]) {
 function save() {
   if (editingId.value) {
     const idx = closings.value.findIndex(c => c.id === editingId.value)
-    if (idx !== -1) {
+    const existing = closings.value[idx]
+    if (existing) {
       closings.value[idx] = {
-        ...closings.value[idx],
+        ...existing,
         cliente: form.value.cliente,
         valor: form.value.valor ?? 0,
-        vencimento: form.value.vencimento ? fmtDate(form.value.vencimento) : closings.value[idx].vencimento,
-        recebimento: form.value.recebimento ? fmtDate(form.value.recebimento) : closings.value[idx].recebimento,
+        vencimento: form.value.vencimento ? fmtDate(form.value.vencimento) : existing.vencimento,
+        recebimento: form.value.recebimento ? fmtDate(form.value.recebimento) : existing.recebimento,
         status: form.value.status,
       }
     }

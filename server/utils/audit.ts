@@ -1,9 +1,10 @@
 // CPEK — AuditLog helper (ARCHITECTURE §14). Registra ações sensíveis:
 // fechar/reabrir período, excluir lançamento, alterar campo custom, gerenciar membro.
 import type { Prisma } from '@prisma/client'
+import type { TenantTransactionClient } from './withTenant'
 
 export async function writeAudit(
-  tx: Prisma.TransactionClient,
+  tx: TenantTransactionClient,
   params: { tenantId: string; userId?: string; action: string; entity: string; entityId?: string; meta?: Prisma.InputJsonValue },
 ): Promise<void> {
   await tx.auditLog.create({

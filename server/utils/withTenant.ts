@@ -9,12 +9,20 @@
 // `tenantId` vem SEMPRE do JWT validado no servidor (app_metadata.account_id),
 // NUNCA do corpo da requisição (§4.2 / §9).
 // ============================================================================
-import type { Prisma } from '@prisma/client'
 import { prisma, tenantStore } from './prisma'
+
+// `Prisma.TransactionClient` genérico não é atribuível ao tx real de um client
+// estendido via $extends (limitação conhecida de tipos do Prisma) — o tipo do
+// tx precisa ser derivado do próprio client estendido, igual ao workaround
+// documentado pelo Prisma para esse caso.
+export type TenantTransactionClient = Omit<
+  typeof prisma,
+  '$connect' | '$disconnect' | '$on' | '$transaction' | '$extends'
+>
 
 export function withTenant<T>(
   tenantId: string,
-  fn: (tx: Prisma.TransactionClient) => Promise<T>,
+  fn: (tx: TenantTransactionClient) => Promise<T>,
 ): Promise<T> {
   // tenantStore: torna o tenant visível para a extension de guard (§4.3 ponto 3).
   // A transação + set_config (abaixo) são o padrão exato da §4.2 e a base do RLS.

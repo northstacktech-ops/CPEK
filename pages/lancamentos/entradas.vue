@@ -77,14 +77,14 @@ const today = () => new Date().toLocaleDateString('pt-BR')
 
 function openNew() {
   editingId.value = null
-  form.value = { valor: null, jaRecebido: false, dataRecebimento: null, descricao: '', categoria: null, conta: null, dataCompetencia: new Date(), dataVencimento: new Date(), cliente: null, centroCusto: null, taxa: null, servico: null, deslocamento: null, status: 'Em Aberto', data: null }
+  form.value = { valor: null, jaRecebido: false, dataRecebimento: null, descricao: '', categoria: null, conta: null, dataCompetencia: new Date(), dataVencimento: new Date(), cliente: null, centroCusto: null, taxa: null, servico: null, deslocamento: null, status: 'Em Aberto', data: null, recorrente: false, recorrenciaFreq: 'Mensal', recorrenciaQtd: '12 meses' }
   activeModalTab.value = 0
   drawerOpen.value = true
 }
 
 function openEdit(row: typeof entries.value[0]) {
   editingId.value = row.id
-  form.value = { valor: row.valor, jaRecebido: false, dataRecebimento: null, descricao: '', categoria: null, conta: null, dataCompetencia: new Date(), dataVencimento: new Date(), cliente: row.cliente, centroCusto: null, taxa: null, servico: row.servico, deslocamento: row.deslocamento, status: row.status, data: null }
+  form.value = { valor: row.valor, jaRecebido: false, dataRecebimento: null, descricao: '', categoria: null, conta: null, dataCompetencia: new Date(), dataVencimento: new Date(), cliente: row.cliente, centroCusto: null, taxa: null, servico: row.servico, deslocamento: row.deslocamento, status: row.status, data: null, recorrente: false, recorrenciaFreq: 'Mensal', recorrenciaQtd: '12 meses' }
   activeModalTab.value = 0
   drawerOpen.value = true
 }
@@ -93,13 +93,14 @@ function saveEntry() {
   const dataStr = form.value.dataCompetencia ? fmtDate(form.value.dataCompetencia) : today()
   if (editingId.value) {
     const idx = entries.value.findIndex(e => e.id === editingId.value)
-    if (idx !== -1) {
+    const existing = entries.value[idx]
+    if (existing) {
       entries.value[idx] = {
-        ...entries.value[idx],
+        ...existing,
         cliente: form.value.cliente ?? '',
         servico: form.value.servico ?? '',
         valor: form.value.valor ?? 0,
-        deslocamento: entries.value[idx].deslocamento,
+        deslocamento: existing.deslocamento,
         status: form.value.status,
         data: dataStr,
       }

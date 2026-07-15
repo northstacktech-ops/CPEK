@@ -48,7 +48,8 @@ function openEdit(row: typeof contacts.value[0]) {
 function save() {
   if (editingId.value) {
     const idx = contacts.value.findIndex(c => c.id === editingId.value)
-    if (idx !== -1) contacts.value[idx] = { ...contacts.value[idx], nome: form.value.nome, tipo: form.value.tipo, telefone: form.value.telefone, email: form.value.email, cpfCnpj: form.value.cpfCnpj }
+    const existing = contacts.value[idx]
+    if (existing) contacts.value[idx] = { ...existing, nome: form.value.nome, tipo: form.value.tipo, telefone: form.value.telefone, email: form.value.email, cpfCnpj: form.value.cpfCnpj }
   } else {
     contacts.value.unshift({ id: String(Date.now()), nome: form.value.nome, tipo: form.value.tipo, telefone: form.value.telefone, email: form.value.email, cpfCnpj: form.value.cpfCnpj, status: 'Ativo' })
   }

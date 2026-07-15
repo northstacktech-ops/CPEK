@@ -27,13 +27,19 @@ export function useAuth() {
     if (error) throw error
     const token = data.session?.access_token
     const meta = (data.user?.app_metadata ?? {}) as { account_id?: string; role?: string }
-    if (token && meta.account_id) {
-      session.set({
-        user: { id: data.user!.id, email: data.user!.email, role: meta.role === 'ADMIN' ? 'ADMIN' : 'MEMBER' },
-        accessToken: token,
-        tenantId: meta.account_id,
-      })
+    if (!token || !data.user) {
+      throw new Error('Não foi possível iniciar a sessão. Tente novamente.')
     }
+    if (!meta.account_id) {
+      // Sem account_id não há tenant: entrar deixaria a sessão vazia e o
+      // middleware global mandaria de volta pro /login sem explicar por quê.
+      throw new Error('Esta conta ainda não está vinculada a nenhuma empresa. Fale com o administrador.')
+    }
+    session.set({
+      user: { id: data.user.id, email: data.user.email, role: meta.role === 'ADMIN' ? 'ADMIN' : 'MEMBER' },
+      accessToken: token,
+      tenantId: meta.account_id,
+    })
     // TODO(§9): redirecionamento por papel.
   }
 

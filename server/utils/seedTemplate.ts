@@ -8,7 +8,8 @@
 // IDEMPOTENTE: re-rodar não duplica (verifica existência por chave natural).
 // DEVE rodar dentro de withTenant (recebe o tx) — respeita o RLS.
 // ============================================================================
-import type { CatalogKind, CostType, DreGroup, EntryKind, FieldType, Prisma } from '@prisma/client'
+import type { CatalogKind, CostType, DreGroup, EntryKind, FieldType } from '@prisma/client'
+import type { TenantTransactionClient } from './withTenant'
 
 export interface FranchiseTemplate {
   templateKey: string
@@ -20,7 +21,7 @@ export interface FranchiseTemplate {
 }
 
 export async function applyTemplate(
-  tx: Prisma.TransactionClient,
+  tx: TenantTransactionClient,
   tenantId: string,
   companyId: string,
   template: FranchiseTemplate,

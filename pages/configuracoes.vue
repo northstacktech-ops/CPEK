@@ -52,7 +52,8 @@ function openEditEmpresa(row: typeof empresas.value[0]) {
 
 function saveEmpresa() {
   const idx = empresas.value.findIndex(e => e.id === editingEmpresaId.value)
-  if (idx !== -1) empresas.value[idx] = { ...empresas.value[idx], ...empresaForm.value }
+  const existing = empresas.value[idx]
+  if (existing) empresas.value[idx] = { ...existing, ...empresaForm.value }
   empresaDrawerOpen.value = false
 }
 

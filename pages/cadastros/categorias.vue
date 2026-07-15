@@ -31,7 +31,8 @@ function openEdit(row: typeof items.value[0]) { editingId.value = row.id; form.v
 function save() {
   if (editingId.value) {
     const idx = items.value.findIndex(i => i.id === editingId.value)
-    if (idx !== -1) items.value[idx] = { ...items.value[idx], ...form.value }
+    const existing = items.value[idx]
+    if (existing) items.value[idx] = { ...existing, ...form.value }
   } else {
     items.value.unshift({ id: String(Date.now()), ...form.value })
   }

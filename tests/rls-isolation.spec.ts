@@ -27,18 +27,21 @@ const TENANT_MODELS = [
   'auditLog',
 ] as const
 
-beforeAll(async () => {
-  await cleanup()
-  await seedTenant(TENANT_A)
-  await seedTenant(TENANT_B)
-}, 30_000)
+// Sem DATABASE_URL (ou TEST_DATABASE_URL, ver tests/setup.ts), não há banco para
+// rodar contra — pula a suíte inteira em vez de deixar beforeAll/afterAll
+// lançarem erro não tratado e derrubarem o resto da run de testes.
+describe.skipIf(!process.env.DATABASE_URL)('Isolamento RLS (matriz)', () => {
+  beforeAll(async () => {
+    await cleanup()
+    await seedTenant(TENANT_A)
+    await seedTenant(TENANT_B)
+  }, 30_000)
 
-afterAll(async () => {
-  await cleanup()
-  await prismaBase.$disconnect()
-})
+  afterAll(async () => {
+    await cleanup()
+    await prismaBase.$disconnect()
+  })
 
-describe('Isolamento RLS (matriz)', () => {
   it.each(TENANT_MODELS)('tenant A não enxerga %s do tenant B', async (model) => {
     await withTenant(TENANT_A, async (tx) => {
       const rows = await (tx as any)[model].findMany()

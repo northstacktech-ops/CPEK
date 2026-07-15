@@ -7,7 +7,8 @@
 //   [{ fieldKey, value, _label, _type }]
 // Reports preferem a definição VIVA (por fieldKey); campo removido cai no cache.
 // ============================================================================
-import type { Prisma, EntryKind } from '@prisma/client'
+import type { EntryKind } from '@prisma/client'
+import type { TenantTransactionClient } from './withTenant'
 
 export interface CustomSnapshotItem {
   fieldKey: string
@@ -23,7 +24,7 @@ export interface CustomSnapshotItem {
  *   lançar VALIDATION_ERROR em obrigatório ausente.
  */
 export async function buildCustomSnapshot(
-  tx: Prisma.TransactionClient,
+  tx: TenantTransactionClient,
   companyId: string,
   kind: EntryKind,
   values: Record<string, unknown>,

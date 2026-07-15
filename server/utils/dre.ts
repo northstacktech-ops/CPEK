@@ -5,8 +5,8 @@
 // (Prisma groupBy / SQL agregado DENTRO de withTenant) em vez de carregar linhas.
 // Resultado tipado (DreReport) consumido pela tela e pelo export PDF.
 // ============================================================================
-import type { Prisma } from '@prisma/client'
 import type { DreMode, DreReport } from '../../types/dre'
+import type { TenantTransactionClient } from './withTenant'
 
 /** Margem de Contribuição (R$) = Receita Operacional − Custo Operacional (§7.1). */
 export function computeMargin(operatingRevenue: number, operatingCost: number): number {
@@ -33,7 +33,7 @@ export interface BuildDreParams {
  *   Operacional; filtro por bankAccountId; linhas Margem/Resultado/Variação.
  */
 export async function buildDre(
-  _tx: Prisma.TransactionClient,
+  _tx: TenantTransactionClient,
   params: BuildDreParams,
 ): Promise<DreReport> {
   // TODO(§7): implementar agregação real.

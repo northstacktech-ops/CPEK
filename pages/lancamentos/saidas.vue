@@ -81,14 +81,15 @@ function openEdit(row: typeof exits.value[0]) {
 function save() {
   if (editingId.value) {
     const idx = exits.value.findIndex(e => e.id === editingId.value)
-    if (idx !== -1) {
+    const existing = exits.value[idx]
+    if (existing) {
       exits.value[idx] = {
-        ...exits.value[idx],
-        fornecedor: form.value.fornecedor ?? exits.value[idx].fornecedor,
-        categoria: form.value.categoria ?? exits.value[idx].categoria,
-        centroCusto: form.value.centroCusto ?? exits.value[idx].centroCusto,
+        ...existing,
+        fornecedor: form.value.fornecedor ?? existing.fornecedor,
+        categoria: form.value.categoria ?? existing.categoria,
+        centroCusto: form.value.centroCusto ?? existing.centroCusto,
         valor: form.value.valor ?? 0,
-        vencimento: form.value.dataVencimento ? fmtDate(form.value.dataVencimento) : exits.value[idx].vencimento,
+        vencimento: form.value.dataVencimento ? fmtDate(form.value.dataVencimento) : existing.vencimento,
         status: form.value.status,
       }
     }

@@ -60,8 +60,8 @@ async function loadItems() {
       query: { companyId: company.activeId, kind: props.kind },
     })
     items.value = response.items
-  } catch {
-    error.value = 'Não foi possível carregar os cadastros.'
+  } catch (err) {
+    error.value = apiErrorMessage(err, 'Não foi possível carregar os cadastros.')
   } finally {
     loading.value = false
   }
@@ -109,8 +109,8 @@ async function save() {
       items.value = [response.item, ...items.value]
     }
     dialogOpen.value = false
-  } catch {
-    error.value = 'Não foi possível salvar o cadastro.'
+  } catch (err) {
+    error.value = apiErrorMessage(err, 'Não foi possível salvar o cadastro.')
   } finally {
     saving.value = false
   }
@@ -121,8 +121,8 @@ async function remove(item: CatalogItem) {
   try {
     await api<{ ok: boolean }>(`/api/catalogs/${item.id}`, { method: 'DELETE' })
     items.value = items.value.map((current) => (current.id === item.id ? { ...current, active: false } : current))
-  } catch {
-    error.value = 'Não foi possível desativar o cadastro.'
+  } catch (err) {
+    error.value = apiErrorMessage(err, 'Não foi possível desativar o cadastro.')
   }
 }
 

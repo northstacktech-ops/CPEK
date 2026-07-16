@@ -172,8 +172,8 @@ async function loadExits() {
       query: { companyId: company.activeId, periodId: currentPeriod.id },
     })
     exits.value = response.items.map(normalizeExit)
-  } catch {
-    error.value = 'Não foi possível carregar as saídas.'
+  } catch (err) {
+    error.value = apiErrorMessage(err, 'Não foi possível carregar as saídas.')
   } finally {
     loading.value = false
   }
@@ -277,8 +277,8 @@ async function save() {
       exits.value = [normalized, ...exits.value]
     }
     drawerOpen.value = false
-  } catch {
-    error.value = 'Não foi possível salvar a saída.'
+  } catch (err) {
+    error.value = apiErrorMessage(err, 'Não foi possível salvar a saída.')
   } finally {
     saving.value = false
   }
@@ -289,8 +289,8 @@ async function deleteExit(id: string) {
   try {
     await api<{ ok: boolean }>(`/api/exits/${id}`, { method: 'DELETE' })
     exits.value = exits.value.filter((exit) => exit.id !== id)
-  } catch {
-    error.value = 'Não foi possível excluir a saída.'
+  } catch (err) {
+    error.value = apiErrorMessage(err, 'Não foi possível excluir a saída.')
   }
 }
 

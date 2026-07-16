@@ -202,8 +202,8 @@ async function loadEntries() {
       query: { companyId: company.activeId, periodId: currentPeriod.id },
     })
     entries.value = response.items.map(normalizeEntry)
-  } catch {
-    error.value = 'Não foi possível carregar as entradas.'
+  } catch (err) {
+    error.value = apiErrorMessage(err, 'Não foi possível carregar as entradas.')
   } finally {
     loading.value = false
   }
@@ -321,8 +321,8 @@ async function saveEntry() {
       entries.value = [normalized, ...entries.value]
     }
     drawerOpen.value = false
-  } catch {
-    error.value = 'Não foi possível salvar a entrada.'
+  } catch (err) {
+    error.value = apiErrorMessage(err, 'Não foi possível salvar a entrada.')
   } finally {
     saving.value = false
   }
@@ -333,8 +333,8 @@ async function deleteEntry(id: string) {
   try {
     await api<{ ok: boolean }>(`/api/entries/${id}`, { method: 'DELETE' })
     entries.value = entries.value.filter((entry) => entry.id !== id)
-  } catch {
-    error.value = 'Não foi possível excluir a entrada.'
+  } catch (err) {
+    error.value = apiErrorMessage(err, 'Não foi possível excluir a entrada.')
   }
 }
 

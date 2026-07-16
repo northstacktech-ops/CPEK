@@ -39,8 +39,8 @@ async function loadContact() {
       query: { companyId: company.activeId ?? undefined },
     })
     contact.value = response.items.find((item) => item.id === route.params.id) ?? null
-  } catch {
-    error.value = 'Não foi possível carregar o contato.'
+  } catch (err) {
+    error.value = apiErrorMessage(err, 'Não foi possível carregar o contato.')
   } finally {
     loading.value = false
   }

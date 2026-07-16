@@ -75,8 +75,8 @@ async function loadPeriods() {
       periodStore.periodId = active.id
       periodStore.status = active.status
     }
-  } catch {
-    error.value = 'Não foi possível carregar os períodos.'
+  } catch (err) {
+    error.value = apiErrorMessage(err, 'Não foi possível carregar os períodos.')
   } finally {
     loading.value = false
   }
@@ -103,8 +103,8 @@ async function save() {
     periodStore.periodId = response.item.id
     periodStore.status = response.item.status
     drawerOpen.value = false
-  } catch {
-    error.value = 'Não foi possível criar o período.'
+  } catch (err) {
+    error.value = apiErrorMessage(err, 'Não foi possível criar o período.')
   } finally {
     saving.value = false
   }
@@ -125,8 +125,8 @@ async function closePeriod(row: PeriodRow) {
     })
     periodos.value = periodos.value.map((item) => (item.id === row.id ? normalizePeriod(response.item) : item))
     if (activePeriodId.value === row.id) periodStore.status = response.item.status
-  } catch {
-    error.value = 'Não foi possível fechar o período.'
+  } catch (err) {
+    error.value = apiErrorMessage(err, 'Não foi possível fechar o período.')
   }
 }
 
@@ -136,8 +136,8 @@ async function reopenPeriod(row: PeriodRow) {
     const response = await api<{ item: PeriodRecord }>(`/api/periods/${row.id}/reopen`, { method: 'POST' })
     periodos.value = periodos.value.map((item) => (item.id === row.id ? normalizePeriod(response.item) : item))
     if (activePeriodId.value === row.id) periodStore.status = response.item.status
-  } catch {
-    error.value = 'Não foi possível reabrir o período.'
+  } catch (err) {
+    error.value = apiErrorMessage(err, 'Não foi possível reabrir o período.')
   }
 }
 

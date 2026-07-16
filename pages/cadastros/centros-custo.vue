@@ -41,8 +41,8 @@ async function loadItems() {
   try {
     const response = await api<{ items: CostCenter[] }>('/api/cost-centers', { query: { companyId: company.activeId } })
     items.value = response.items
-  } catch {
-    error.value = 'Não foi possível carregar os centros de custo.'
+  } catch (err) {
+    error.value = apiErrorMessage(err, 'Não foi possível carregar os centros de custo.')
   } finally {
     loading.value = false
   }
@@ -79,8 +79,8 @@ async function save() {
       items.value = [response.item, ...items.value]
     }
     drawerOpen.value = false
-  } catch {
-    error.value = 'Não foi possível salvar o centro de custo.'
+  } catch (err) {
+    error.value = apiErrorMessage(err, 'Não foi possível salvar o centro de custo.')
   } finally {
     saving.value = false
   }

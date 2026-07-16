@@ -161,8 +161,8 @@ async function loadClosings() {
       query: { companyId: company.activeId, periodId: currentPeriod.id },
     })
     closings.value = response.items.map(normalizeClosing)
-  } catch {
-    error.value = 'Não foi possível carregar os fechamentos.'
+  } catch (err) {
+    error.value = apiErrorMessage(err, 'Não foi possível carregar os fechamentos.')
   } finally {
     loading.value = false
   }
@@ -254,8 +254,8 @@ async function save() {
       closings.value = [normalized, ...closings.value]
     }
     drawerOpen.value = false
-  } catch {
-    error.value = 'Não foi possível salvar o fechamento.'
+  } catch (err) {
+    error.value = apiErrorMessage(err, 'Não foi possível salvar o fechamento.')
   } finally {
     saving.value = false
   }
@@ -266,8 +266,8 @@ async function deleteClosing(id: string) {
   try {
     await api<{ ok: boolean }>(`/api/closings/${id}`, { method: 'DELETE' })
     closings.value = closings.value.filter((closing) => closing.id !== id)
-  } catch {
-    error.value = 'Não foi possível excluir o fechamento.'
+  } catch (err) {
+    error.value = apiErrorMessage(err, 'Não foi possível excluir o fechamento.')
   }
 }
 

@@ -44,8 +44,8 @@ async function loadItems() {
   try {
     const response = await api<{ items: BankAccount[] }>('/api/bank-accounts', { query: { companyId: company.activeId } })
     items.value = response.items
-  } catch {
-    error.value = 'Não foi possível carregar as contas.'
+  } catch (err) {
+    error.value = apiErrorMessage(err, 'Não foi possível carregar as contas.')
   } finally {
     loading.value = false
   }
@@ -71,8 +71,8 @@ async function save() {
     })
     items.value = [response.item, ...items.value]
     drawerOpen.value = false
-  } catch {
-    error.value = 'Não foi possível salvar a conta.'
+  } catch (err) {
+    error.value = apiErrorMessage(err, 'Não foi possível salvar a conta.')
   } finally {
     saving.value = false
   }

@@ -37,9 +37,9 @@ async function refreshDashboard() {
 
   try {
     dashboard.value = await load()
-  } catch {
+  } catch (err) {
     dashboard.value = null
-    error.value = 'Não foi possível carregar o painel. Verifique sua conexão e tente novamente.'
+    error.value = apiErrorMessage(err, 'Não foi possível carregar o painel. Verifique sua conexão e tente novamente.')
   } finally {
     loading.value = false
   }

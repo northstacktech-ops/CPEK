@@ -49,8 +49,8 @@ async function createCompany() {
     company.setActive(response.company.id)
     applyProfile(response.company)
     createDialogOpen.value = false
-  } catch {
-    createError.value = 'Não foi possível criar a empresa agora.'
+  } catch (err) {
+    createError.value = apiErrorMessage(err, 'Não foi possível criar a empresa agora.')
   } finally {
     creating.value = false
   }
@@ -245,8 +245,8 @@ async function reload() {
   try {
     await loadCompanies()
     applyProfile(activeCompany.value)
-  } catch {
-    error.value = 'Não foi possível carregar os dados da empresa.'
+  } catch (err) {
+    error.value = apiErrorMessage(err, 'Não foi possível carregar os dados da empresa.')
   } finally {
     loading.value = false
   }
@@ -313,8 +313,8 @@ async function saveCompany() {
     applyProfile(response.item)
     editing.value = false
     savedMessage.value = 'Dados da empresa salvos com sucesso.'
-  } catch {
-    error.value = 'Não foi possível salvar os dados da empresa agora.'
+  } catch (err) {
+    error.value = apiErrorMessage(err, 'Não foi possível salvar os dados da empresa agora.')
   } finally {
     saving.value = false
   }

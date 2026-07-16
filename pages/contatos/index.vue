@@ -94,8 +94,8 @@ async function loadContacts() {
       query: { companyId: company.activeId ?? undefined },
     })
     contacts.value = response.items.map(normalizeContact)
-  } catch {
-    error.value = 'Não foi possível carregar os contatos.'
+  } catch (err) {
+    error.value = apiErrorMessage(err, 'Não foi possível carregar os contatos.')
   } finally {
     loading.value = false
   }
@@ -165,8 +165,8 @@ async function save() {
       activeTab.value = normalized.raw.type
     }
     drawerOpen.value = false
-  } catch {
-    error.value = 'Não foi possível salvar o contato.'
+  } catch (err) {
+    error.value = apiErrorMessage(err, 'Não foi possível salvar o contato.')
   } finally {
     saving.value = false
   }
@@ -182,8 +182,8 @@ async function toggleStatus(row: ContactRow) {
     contacts.value = contacts.value.map((contact) =>
       contact.id === row.id ? normalizeContact({ ...row.raw, ...response.item, active: nextActive }) : contact,
     )
-  } catch {
-    error.value = 'Não foi possível alterar o status do contato.'
+  } catch (err) {
+    error.value = apiErrorMessage(err, 'Não foi possível alterar o status do contato.')
   }
 }
 

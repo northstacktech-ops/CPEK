@@ -66,8 +66,8 @@ async function loadItems() {
   try {
     const response = await api<{ items: CustomField[] }>('/api/custom-fields', { query: { companyId: company.activeId } })
     items.value = response.items
-  } catch {
-    error.value = 'Não foi possível carregar os campos personalizados.'
+  } catch (err) {
+    error.value = apiErrorMessage(err, 'Não foi possível carregar os campos personalizados.')
   } finally {
     loading.value = false
   }
@@ -107,8 +107,8 @@ async function save() {
       items.value = [response.item, ...items.value]
     }
     drawerOpen.value = false
-  } catch {
-    error.value = 'Não foi possível salvar o campo personalizado.'
+  } catch (err) {
+    error.value = apiErrorMessage(err, 'Não foi possível salvar o campo personalizado.')
   } finally {
     saving.value = false
   }
@@ -119,8 +119,8 @@ async function deleteItem(id: string) {
   try {
     await api<{ ok: boolean }>(`/api/custom-fields/${id}`, { method: 'DELETE' })
     items.value = items.value.filter((item) => item.id !== id)
-  } catch {
-    error.value = 'Não foi possível remover o campo.'
+  } catch (err) {
+    error.value = apiErrorMessage(err, 'Não foi possível remover o campo.')
   }
 }
 

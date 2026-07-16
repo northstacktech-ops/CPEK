@@ -57,7 +57,11 @@ function openNew() {
 }
 
 async function save() {
-  if (!company.activeId || saving.value) return
+  if (saving.value) return
+  if (!company.activeId) {
+    error.value = 'Selecione ou crie uma empresa em Configurações antes de criar uma conta.'
+    return
+  }
   saving.value = true
   error.value = null
   try {

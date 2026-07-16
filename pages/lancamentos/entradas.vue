@@ -266,7 +266,11 @@ function openEdit(row: EntryRow) {
 }
 
 async function saveEntry() {
-  if (!company.activeId || saving.value) return
+  if (saving.value) return
+  if (!company.activeId) {
+    error.value = 'Selecione ou crie uma empresa em Configurações antes de lançar uma entrada.'
+    return
+  }
   saving.value = true
   error.value = null
 

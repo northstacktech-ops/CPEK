@@ -86,7 +86,15 @@ function openEdit(row: CustomField) {
 }
 
 async function save() {
-  if (!company.activeId || saving.value || !form.value.label.trim()) return
+  if (saving.value) return
+  if (!company.activeId) {
+    error.value = 'Selecione ou crie uma empresa em Configurações antes de criar um campo customizado.'
+    return
+  }
+  if (!form.value.label.trim()) {
+    error.value = 'Informe um nome para o campo customizado.'
+    return
+  }
   saving.value = true
   error.value = null
   try {

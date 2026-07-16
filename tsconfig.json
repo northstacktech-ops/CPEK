@@ -7,6 +7,7 @@
     "forceConsistentCasingInFileNames": true,
     "types": ["node", "vitest/globals"]
   },
+  "files": [".nuxt/nuxt.d.ts", ".nuxt/types/nitro.d.ts"],
   "include": [
     ".nuxt/**/*.d.ts",
     "**/*.ts",

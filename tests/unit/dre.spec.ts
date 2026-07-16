@@ -7,10 +7,18 @@ describe('DRE — fórmulas básicas (§7.1)', () => {
     expect(computeMargin(1000, 400)).toBeCloseTo(600, 2)
   })
 
-  it('Margem % = Margem ÷ Receita Op (0 quando receita = 0)', () => {
-    const receita: number = 1000
-    const marginPct = receita === 0 ? 0 : 600 / receita
+  it('Margem % = Margem ÷ Receita Op', () => {
+    const operatingRevenue: number = 1000
+    const margin = computeMargin(operatingRevenue, 400)
+    const marginPct = operatingRevenue === 0 ? 0 : margin / operatingRevenue
     expect(marginPct).toBeCloseTo(0.6, 4)
+  })
+
+  it('Margem % = 0 quando receita = 0 (evita divisão por zero)', () => {
+    const operatingRevenue = 0
+    const margin = computeMargin(operatingRevenue, 0)
+    const marginPct = operatingRevenue === 0 ? 0 : margin / operatingRevenue
+    expect(marginPct).toBe(0)
   })
 
   // TODO(§7.3): testes de agregação por dreGroup/serviceId/mês e realizado×agendado.

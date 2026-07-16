@@ -15,7 +15,11 @@ Gestão financeira multiunidade · multi-tenant · Vue 3 + Nuxt 3 · Supabase/Po
 
 ---
 
-## 1. Variáveis de ambiente (`.env.local`)
+## 1. Variáveis de ambiente (`.env`)
+
+> O Nuxt/Nitro só carrega `.env` automaticamente em dev — `.env.local` (citado em
+> versões antigas deste doc) **não é lido** e o servidor sobe sem as variáveis,
+> falhando com "supabaseUrl is required." no login.
 
 ```env
 # Runtime — pooler Supavisor (papel cpek_app, submetido ao RLS)

@@ -388,6 +388,7 @@ onMounted(() => {
 
     <Dialog v-model:visible="drawerOpen" modal :header="editingId ? 'Editar saída' : 'Conta a pagar'" class="!w-[720px] !max-w-[96vw]" :draggable="false">
       <form class="grid gap-4 md:grid-cols-2" @submit.prevent="save">
+        <Message v-if="error" severity="error" size="small" class="md:col-span-2">{{ error }}</Message>
         <div class="flex flex-col gap-1.5">
           <label class="text-xs font-semibold uppercase tracking-wide text-surface-500">Valor da despesa</label>
           <InputNumber v-model="form.valor" mode="currency" currency="BRL" locale="pt-BR" fluid />

@@ -288,6 +288,7 @@ onMounted(() => {
 
     <Dialog v-model:visible="drawerOpen" modal :header="editingId ? 'Editar contato' : newButtonLabel" class="!w-[520px] !max-w-[96vw]" :draggable="false">
       <form class="space-y-4" @submit.prevent="save">
+        <Message v-if="error" severity="error" size="small">{{ error }}</Message>
         <div class="flex flex-col gap-1.5">
           <label for="contact-type" class="text-xs font-semibold uppercase tracking-wide text-surface-500">Tipo</label>
           <SelectButton id="contact-type" v-model="form.tipo" :options="tipoOptions" />

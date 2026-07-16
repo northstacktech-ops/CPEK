@@ -121,6 +121,7 @@ onMounted(() => {
 
     <Dialog v-model:visible="drawerOpen" modal header="Nova conta bancária" class="!w-[480px] !max-w-[96vw]" :draggable="false">
       <form class="space-y-4" @submit.prevent="save">
+        <Message v-if="error" severity="error" size="small">{{ error }}</Message>
         <div class="flex flex-col gap-1.5">
           <label class="text-xs font-semibold uppercase tracking-wide text-surface-500">Nome</label>
           <InputText v-model="form.name" fluid />

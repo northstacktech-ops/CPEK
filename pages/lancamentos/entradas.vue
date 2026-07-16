@@ -455,6 +455,7 @@ onMounted(() => {
       :draggable="false"
     >
       <form class="grid gap-4 md:grid-cols-2" @submit.prevent="saveEntry">
+        <Message v-if="error" severity="error" size="small" class="md:col-span-2">{{ error }}</Message>
         <div class="flex flex-col gap-1.5">
           <label class="text-xs font-semibold uppercase tracking-wide text-surface-500">Valor do recebimento</label>
           <InputNumber v-model="form.valor" mode="currency" currency="BRL" locale="pt-BR" fluid />

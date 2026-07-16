@@ -149,6 +149,7 @@ onMounted(() => {
 
     <Dialog v-model:visible="drawerOpen" modal :header="editingId ? 'Editar taxa' : 'Nova taxa'" class="!w-[480px] !max-w-[96vw]" :draggable="false">
       <form class="space-y-4" @submit.prevent="save">
+        <Message v-if="error" severity="error" size="small">{{ error }}</Message>
         <div class="flex flex-col gap-1.5">
           <label class="text-xs font-semibold uppercase tracking-wide text-surface-500">Nome do perfil</label>
           <InputText v-model="form.label" fluid />

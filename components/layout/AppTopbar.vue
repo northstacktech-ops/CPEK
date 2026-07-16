@@ -13,6 +13,8 @@ const darkMode = ref(false)
 const userDisplayName = computed(() => session.user?.email?.split('@')[0] ?? 'Usuário')
 const userInitials = computed(() => userDisplayName.value.slice(0, 2).toUpperCase())
 const userRoleLabel = computed(() => (session.isAdmin ? 'Administrador' : 'Membro'))
+// Conta de acesso único (clebercpinto@icloud.com) — avatar fixo definido pelo usuário.
+const userAvatarUrl = computed(() => (session.user?.email === 'clebercpinto@icloud.com' ? '/avatars/cleber.jpg' : null))
 
 const companyMenuRef = ref()
 const switchTarget = ref<{ id: string; name: string } | null>(null)
@@ -153,7 +155,14 @@ const profileItems = [
             type="button"
             @click="profileMenuRef.toggle($event)"
           >
+            <img
+              v-if="userAvatarUrl"
+              :src="userAvatarUrl"
+              alt=""
+              class="h-8 w-8 flex-shrink-0 rounded-full object-cover ring-2 ring-surface-200 dark:ring-surface-700"
+            />
             <span
+              v-else
               class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-brand-100 text-xs font-bold text-brand-700 ring-2 ring-surface-200 dark:bg-brand-900/40 dark:text-brand-200 dark:ring-surface-700"
             >{{ userInitials }}</span>
             <div class="hidden text-left leading-tight sm:block">

@@ -3,17 +3,20 @@ import { withTenant } from '../utils/withTenant'
 import { requireAdmin, validateBody } from '../utils/http'
 import { createCompanyBody } from '../utils/validators/companies'
 import { applyTemplate, type FranchiseTemplate } from '../utils/seedTemplate'
-import { readFileSync } from 'node:fs'
+import supervisaoTemplate from '../../prisma/seed/templates/supervisao.json'
+import type { z } from 'zod'
+
+// Import estático (não readFileSync em runtime): o Nitro não empacota arquivos
+// lidos dinamicamente fora de server/ no build serverless (Vercel), o que fazia
+// a criação de empresa falhar em produção com ENOENT.
+const templates: Record<z.infer<typeof createCompanyBody>['template'], FranchiseTemplate> = {
+  supervisao: supervisaoTemplate as FranchiseTemplate,
+}
 
 export default defineEventHandler(async (event) => {
   const auth = requireAdmin(event)
   const body = await validateBody(event, createCompanyBody)
-
-  // Carrega o template de franquia (§13). `template` é um enum validado no zod
-  // (createCompanyBody) — nunca string livre — antes de virar path de arquivo.
-  const template = JSON.parse(
-    readFileSync(new URL(`../../prisma/seed/templates/${body.template}.json`, import.meta.url), 'utf8'),
-  ) as FranchiseTemplate
+  const template = templates[body.template]
 
   return withTenant(auth.tenantId, async (tx) => {
     const company = await tx.company.create({

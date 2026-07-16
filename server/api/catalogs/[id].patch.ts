@@ -9,6 +9,8 @@ export default defineEventHandler(async (event) => {
   const body = await validateBody(event, updateCatalogBody)
 
   return withTenant(auth.tenantId, async (tx) => {
+    const current = await tx.catalogValue.findUnique({ where: { id } })
+    if (!current) throw apiError(404, 'NOT_FOUND', 'Cadastro não encontrado')
     const item = await tx.catalogValue.update({ where: { id }, data: body })
     return { item }
   })

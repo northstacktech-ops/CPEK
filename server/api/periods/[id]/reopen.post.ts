@@ -10,6 +10,8 @@ export default defineEventHandler(async (event) => {
   await validateBody(event, closePeriodBody)
 
   return withTenant(auth.tenantId, async (tx) => {
+    const current = await tx.period.findUnique({ where: { id } })
+    if (!current) throw apiError(404, 'NOT_FOUND', 'Período não encontrado')
     const item = await tx.period.update({
       where: { id },
       data: { status: 'OPEN', closedAt: null, closedById: null },

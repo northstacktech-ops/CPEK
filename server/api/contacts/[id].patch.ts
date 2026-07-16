@@ -9,6 +9,8 @@ export default defineEventHandler(async (event) => {
   const body = await validateBody(event, updateContactBody)
 
   return await withTenant(auth.tenantId, async (tx) => {
+    const current = await tx.contact.findUnique({ where: { id } })
+    if (!current) throw apiError(404, 'NOT_FOUND', 'Contato não encontrado')
     const item = await tx.contact.update({ where: { id }, data: body })
     return { item }
   })

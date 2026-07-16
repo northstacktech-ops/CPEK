@@ -12,6 +12,8 @@ export default defineEventHandler(async (event) => {
   const { confirm, ...data } = body
   void confirm
   return withTenant(auth.tenantId, async (tx) => {
+    const current = await tx.customField.findUnique({ where: { id } })
+    if (!current) throw apiError(404, 'NOT_FOUND', 'Campo customizado não encontrado')
     const item = await tx.customField.update({ where: { id }, data })
     await writeAudit(tx, {
       tenantId: auth.tenantId,

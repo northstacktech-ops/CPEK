@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, reactive, watch } from 'vue'
+import { onMounted, reactive, ref, watch } from 'vue'
 import { navigateTo } from '#imports'
 import AppBreadcrumb from '../../components/layout/AppBreadcrumb.vue'
 import PageHeader from '../../components/layout/PageHeader.vue'
@@ -8,6 +8,7 @@ import { useCompanyStore } from '../../stores/company'
 
 const company = useCompanyStore()
 const { api } = useApi()
+const error = ref<string | null>(null)
 
 const sections = reactive([
   { key: 'categorias', label: 'Categorias', icon: 'pi pi-tag', desc: 'Grupos de DRE para cada despesa e receita', count: 0, route: '/cadastros/categorias' },
@@ -22,8 +23,9 @@ const sections = reactive([
 
 async function loadCounts() {
   if (!company.activeId) return
+  error.value = null
   const companyId = company.activeId
-  const [categorias, servicos, status, formas, centros, taxas, contas, campos] = await Promise.allSettled([
+  const results = await Promise.allSettled([
     api<{ items: unknown[] }>('/api/catalogs', { query: { companyId, kind: 'CATEGORY' } }),
     api<{ items: unknown[] }>('/api/catalogs', { query: { companyId, kind: 'SERVICE' } }),
     api<{ items: unknown[] }>('/api/catalogs', { query: { companyId, kind: 'STATUS' } }),
@@ -33,6 +35,7 @@ async function loadCounts() {
     api<{ items: unknown[] }>('/api/bank-accounts', { query: { companyId } }),
     api<{ items: unknown[] }>('/api/custom-fields', { query: { companyId } }),
   ])
+  const [categorias, servicos, status, formas, centros, taxas, contas, campos] = results
   const count = (r: PromiseSettledResult<{ items: unknown[] }>) => (r.status === 'fulfilled' ? r.value.items.length : 0)
   sections[0].count = count(categorias)
   sections[1].count = count(servicos)
@@ -42,6 +45,9 @@ async function loadCounts() {
   sections[5].count = count(taxas)
   sections[6].count = count(contas)
   sections[7].count = count(campos)
+
+  const failed = results.find((r): r is PromiseRejectedResult => r.status === 'rejected')
+  if (failed) error.value = apiErrorMessage(failed.reason, 'Não foi possível carregar todos os contadores de cadastros.')
 }
 
 onMounted(loadCounts)
@@ -60,6 +66,8 @@ watch(() => company.activeId, loadCounts)
     </PageHeader>
 
     <PageContent>
+      <Message v-if="error" severity="error" size="small" class="col-span-12">{{ error }}</Message>
+
       <div class="col-span-12 grid grid-cols-2 gap-3 md:grid-cols-4">
         <div
           v-for="s in sections"

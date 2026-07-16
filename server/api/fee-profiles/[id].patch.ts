@@ -9,6 +9,8 @@ export default defineEventHandler(async (event) => {
   const body = await validateBody(event, updateFeeProfileBody)
 
   return withTenant(auth.tenantId, async (tx) => {
+    const current = await tx.feeProfile.findUnique({ where: { id } })
+    if (!current) throw apiError(404, 'NOT_FOUND', 'Perfil de taxa não encontrado')
     const item = await tx.feeProfile.update({ where: { id }, data: body })
     return { item: { ...item, value: Number(item.value) } }
   })

@@ -9,6 +9,8 @@ export default defineEventHandler(async (event) => {
   const body = await validateBody(event, updateCostCenterBody)
 
   return withTenant(auth.tenantId, async (tx) => {
+    const current = await tx.costCenter.findUnique({ where: { id } })
+    if (!current) throw apiError(404, 'NOT_FOUND', 'Centro de custo não encontrado')
     const item = await tx.costCenter.update({ where: { id }, data: body })
     return { item }
   })

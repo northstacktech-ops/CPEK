@@ -1,5 +1,5 @@
 // PATCH /api/companies - atualiza os dados principais da empresa ativa.
-import { requireAdmin, validateBody } from '../utils/http'
+import { apiError, requireAdmin, validateBody } from '../utils/http'
 import { updateCompanyBody } from '../utils/validators/companies'
 import { withTenant } from '../utils/withTenant'
 
@@ -8,6 +8,8 @@ export default defineEventHandler(async (event) => {
   const body = await validateBody(event, updateCompanyBody)
 
   return await withTenant(auth.tenantId, async (tx) => {
+    const current = await tx.company.findUnique({ where: { id: body.id } })
+    if (!current) throw apiError(404, 'NOT_FOUND', 'Empresa não encontrada')
     const item = await tx.company.update({
       where: { id: body.id },
       data: {

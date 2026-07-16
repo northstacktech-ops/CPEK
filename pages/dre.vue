@@ -48,6 +48,11 @@ const total = (valores: number[]) => valores.reduce((a, b) => a + b, 0)
 
 function isMuted(i: number) { return modoRealizado.value ? i > mesAtual : false }
 
+function percentTotal(valores: number[]) {
+  const visible = valores.filter((_, i) => !isMuted(i))
+  return visible.length ? Math.round(total(visible) / visible.length) : 0
+}
+
 function exportCSV() {
   const header = ['Linha contábil', ...meses, 'Total']
   const lines: string[][] = [header]
@@ -144,7 +149,7 @@ onMounted(() => {
                   <span v-else>{{ brl(v) }}</span>
                 </td>
                 <td class="py-2.5 pl-4 text-right tabular-nums font-bold" :class="row.highlight ? 'text-brand-700 dark:text-brand-200' : row.sign === -1 ? 'text-red-600' : 'text-surface-900 dark:text-surface-0'">
-                  <span v-if="row.percent">{{ Math.round(row.valores.filter((_, i) => !isMuted(i)).reduce((a, b) => a + b, 0) / row.valores.filter((_, i) => !isMuted(i)).length) }}%</span>
+                  <span v-if="row.percent">{{ percentTotal(row.valores) }}%</span>
                   <span v-else>{{ brl(total(row.valores)) }}</span>
                 </td>
               </tr>

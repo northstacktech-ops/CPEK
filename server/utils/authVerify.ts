@@ -40,8 +40,13 @@ export async function resolveAuthContext(token: string): Promise<AuthContext> {
     user = await $fetch<SupabaseUserResponse>(`${url}/auth/v1/user`, {
       headers: { apikey: anon, authorization: `Bearer ${token}` },
     })
-  } catch {
-    throw new JwtError('Token inválido ou expirado')
+  } catch (err) {
+    // Supabase rejeitou o token (401/403) → problema de sessão do usuário.
+    // Qualquer outra falha (rede, timeout, 5xx) → indisponibilidade do serviço,
+    // não "senha errada" — não confundir as duas coisas pro usuário.
+    const status = (err as { response?: { status?: number } } | undefined)?.response?.status
+    if (status === 401 || status === 403) throw new JwtError('Token inválido ou expirado')
+    throw apiError(503, 'AUTH_SERVICE_UNAVAILABLE', 'Não foi possível verificar sua sessão agora. Tente novamente em instantes.')
   }
 
   const tenantId = user.app_metadata?.account_id

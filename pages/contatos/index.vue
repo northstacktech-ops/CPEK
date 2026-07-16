@@ -86,12 +86,13 @@ function normalizeContact(contact: ContactRecord): ContactRow {
 }
 
 async function loadContacts() {
+  if (!company.activeId) return
   loading.value = true
   error.value = null
 
   try {
     const response = await api<{ items: ContactRecord[] }>('/api/contacts', {
-      query: { companyId: company.activeId ?? undefined },
+      query: { companyId: company.activeId },
     })
     contacts.value = response.items.map(normalizeContact)
   } catch (err) {

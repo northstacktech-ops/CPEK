@@ -1,11 +1,13 @@
 // CPEK — validators de Empresas (ARCHITECTURE §8, §13).
 import { z } from 'zod'
 
+// Allow-list dos templates existentes em prisma/seed/templates/*.json — nunca
+// aceitar string livre aqui (viraria path de arquivo lido pelo servidor).
 export const createCompanyBody = z.object({
   name: z.string().min(1).max(160),
   segment: z.string().max(120).optional(),
   // Template de franquia aplicado na criação (§13). Default: supervisao.
-  template: z.string().default('supervisao'),
+  template: z.enum(['supervisao']).default('supervisao'),
 })
 
 export const updateCompanyBody = z.object({

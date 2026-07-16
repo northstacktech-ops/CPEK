@@ -23,6 +23,39 @@ const editing = ref(false)
 const error = ref<string | null>(null)
 const savedMessage = ref<string | null>(null)
 
+const hasCompanies = computed(() => company.companies.length > 0)
+const createDialogOpen = ref(false)
+const creating = ref(false)
+const createError = ref<string | null>(null)
+const createForm = reactive({ name: '', segment: 'Vistoria Cautelar' })
+
+function openCreateCompany() {
+  createForm.name = ''
+  createForm.segment = 'Vistoria Cautelar'
+  createError.value = null
+  createDialogOpen.value = true
+}
+
+async function createCompany() {
+  if (!createForm.name.trim() || creating.value) return
+  creating.value = true
+  createError.value = null
+  try {
+    const response = await api<{ company: CompanyRef }>('/api/companies', {
+      method: 'POST',
+      body: { name: createForm.name.trim(), segment: createForm.segment },
+    })
+    await loadCompanies()
+    company.setActive(response.company.id)
+    applyProfile(response.company)
+    createDialogOpen.value = false
+  } catch {
+    createError.value = 'Não foi possível criar a empresa agora.'
+  } finally {
+    creating.value = false
+  }
+}
+
 const emptyProfile: CompanyProfile = {
   id: '',
   name: '',
@@ -308,20 +341,35 @@ watch(
       </template>
       <template #actions>
         <Button
-          v-if="!editing"
+          v-if="hasCompanies && !editing"
           label="Editar"
           icon="pi pi-pencil"
           :disabled="loading || !activeCompany"
           @click="startEditing"
         />
-        <div v-else class="flex gap-2">
+        <div v-else-if="hasCompanies" class="flex gap-2">
           <Button label="Cancelar" severity="secondary" outlined :disabled="saving" @click="cancelEditing" />
           <Button label="Salvar" icon="pi pi-save" :loading="saving" @click="saveCompany" />
         </div>
       </template>
     </PageHeader>
 
-    <PageContent>
+    <PageContent v-if="!loading && !hasCompanies">
+      <Card class="col-span-12 border border-surface-200 dark:border-surface-800">
+        <template #content>
+          <div class="flex flex-col items-center gap-3 py-10 text-center">
+            <i class="pi pi-building text-4xl text-surface-300" />
+            <h2 class="text-lg font-bold text-surface-900 dark:text-surface-0">Nenhuma empresa cadastrada</h2>
+            <p class="max-w-sm text-sm text-surface-500">
+              Crie a primeira empresa da sua conta para começar a lançar entradas, saídas e fechamentos.
+            </p>
+            <Button label="Criar empresa" icon="pi pi-plus" @click="openCreateCompany" />
+          </div>
+        </template>
+      </Card>
+    </PageContent>
+
+    <PageContent v-else>
       <Message v-if="error" severity="error" size="small" class="col-span-12">
         {{ error }}
       </Message>
@@ -527,5 +575,25 @@ watch(
         </form>
       </template>
     </PageContent>
+
+    <Dialog v-model:visible="createDialogOpen" modal header="Criar empresa" class="!w-[440px] !max-w-[96vw]" :draggable="false">
+      <form class="space-y-4" @submit.prevent="createCompany">
+        <Message v-if="createError" severity="error" size="small">{{ createError }}</Message>
+        <div class="flex flex-col gap-1.5">
+          <label class="text-xs font-semibold uppercase tracking-wide text-surface-500">Nome fantasia</label>
+          <InputText v-model="createForm.name" fluid />
+        </div>
+        <div class="flex flex-col gap-1.5">
+          <label class="text-xs font-semibold uppercase tracking-wide text-surface-500">Segmento</label>
+          <Select v-model="createForm.segment" :options="segmentOptions" option-label="label" option-value="value" editable fluid />
+        </div>
+      </form>
+      <template #footer>
+        <div class="flex gap-2 pt-1">
+          <Button label="Cancelar" severity="secondary" outlined fluid @click="createDialogOpen = false" />
+          <Button label="Criar" :loading="creating" :disabled="!createForm.name.trim()" fluid @click="createCompany" />
+        </div>
+      </template>
+    </Dialog>
   </div>
 </template>

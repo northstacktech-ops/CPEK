@@ -56,5 +56,38 @@ export function useAuth() {
     await navigateTo('/login')
   }
 
-  return { signIn, signOut }
+  /**
+   * Restaura a sessão do app a partir da sessão do Supabase já persistida no
+   * client (localStorage do próprio SDK). Sem isso, o store de sessão (Pinia,
+   * só em memória) fica vazio a cada reload e o middleware manda todo mundo
+   * de volta pro /login mesmo com um login válido.
+   */
+  async function restoreSession(): Promise<boolean> {
+    const { data } = await useSupabase().auth.getSession()
+    const token = data.session?.access_token
+    const user = data.session?.user
+    const meta = (user?.app_metadata ?? {}) as { account_id?: string; role?: string }
+    if (!token || !user || !meta.account_id) return false
+
+    session.set({
+      user: { id: user.id, email: user.email, role: meta.role === 'ADMIN' ? 'ADMIN' : 'MEMBER' },
+      accessToken: token,
+      tenantId: meta.account_id,
+    })
+
+    try {
+      const me = await $fetch<{
+        companies: Array<{ id: string; name: string; segment?: string | null }>
+      }>('/api/me', {
+        headers: { authorization: `Bearer ${token}` },
+      })
+      company.setCompanies(me.companies)
+    } catch {
+      // Sessão existe no client mas o servidor recusou (ex.: revogada) —
+      // segue autenticado sem empresas; as telas tratam a lista vazia.
+    }
+    return true
+  }
+
+  return { signIn, signOut, restoreSession }
 }

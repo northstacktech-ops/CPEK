@@ -1,19 +1,51 @@
 <script setup lang="ts">
+import { onMounted, reactive, watch } from 'vue'
 import { navigateTo } from '#imports'
 import AppBreadcrumb from '../../components/layout/AppBreadcrumb.vue'
 import PageHeader from '../../components/layout/PageHeader.vue'
 import PageContent from '../../components/layout/PageContent.vue'
+import { useCompanyStore } from '../../stores/company'
 
-const sections = [
-  { label: 'Categorias', icon: 'pi pi-tag', desc: 'Grupos de DRE para cada despesa e receita', count: 8, route: '/cadastros/categorias' },
-  { label: 'Serviços', icon: 'pi pi-briefcase', desc: 'Cautelar, Certicar e Constatação', count: 3, route: '/cadastros/serviços' },
-  { label: 'Status', icon: 'pi pi-circle', desc: 'Em Aberto, Pago, Vencido, Cancelado', count: 4, route: '/cadastros/status' },
-  { label: 'Formas de Pgto.', icon: 'pi pi-credit-card', desc: 'Dinheiro, PIX, Cartão, Boleto', count: 5, route: '/cadastros/formas-pagamento' },
-  { label: 'Centros de Custo', icon: 'pi pi-objects-column', desc: 'Fixo e Variável', count: 2, route: '/cadastros/centros-custo' },
-  { label: 'Taxas e Juros', icon: 'pi pi-percentage', desc: 'Perfis reutilizáveis de taxas', count: 2, route: '/cadastros/taxas' },
-  { label: 'Contas Bancárias', icon: 'pi pi-building-columns', desc: 'Boleto, Caixa, Cartão, Cortesia', count: 4, route: '/cadastros/contas' },
-  { label: 'Campos Personalizados', icon: 'pi pi-sliders-h', desc: 'Placa, Modelo, RENAVAM e outros', count: 3, route: '/cadastros/campos-custom' },
-]
+const company = useCompanyStore()
+const { api } = useApi()
+
+const sections = reactive([
+  { key: 'categorias', label: 'Categorias', icon: 'pi pi-tag', desc: 'Grupos de DRE para cada despesa e receita', count: 0, route: '/cadastros/categorias' },
+  { key: 'servicos', label: 'Serviços', icon: 'pi pi-briefcase', desc: 'Cautelar, Certicar e Constatação', count: 0, route: '/cadastros/servicos' },
+  { key: 'status', label: 'Status', icon: 'pi pi-circle', desc: 'Em Aberto, Pago, Vencido, Cancelado', count: 0, route: '/cadastros/status' },
+  { key: 'formas-pagamento', label: 'Formas de Pgto.', icon: 'pi pi-credit-card', desc: 'Dinheiro, PIX, Cartão, Boleto', count: 0, route: '/cadastros/formas-pagamento' },
+  { key: 'centros-custo', label: 'Centros de Custo', icon: 'pi pi-objects-column', desc: 'Fixo e Variável', count: 0, route: '/cadastros/centros-custo' },
+  { key: 'taxas', label: 'Taxas e Juros', icon: 'pi pi-percentage', desc: 'Perfis reutilizáveis de taxas', count: 0, route: '/cadastros/taxas' },
+  { key: 'contas', label: 'Contas Bancárias', icon: 'pi pi-building-columns', desc: 'Boleto, Caixa, Cartão, Cortesia', count: 0, route: '/cadastros/contas' },
+  { key: 'campos-custom', label: 'Campos Personalizados', icon: 'pi pi-sliders-h', desc: 'Placa, Modelo, RENAVAM e outros', count: 0, route: '/cadastros/campos-custom' },
+])
+
+async function loadCounts() {
+  if (!company.activeId) return
+  const companyId = company.activeId
+  const [categorias, servicos, status, formas, centros, taxas, contas, campos] = await Promise.allSettled([
+    api<{ items: unknown[] }>('/api/catalogs', { query: { companyId, kind: 'CATEGORY' } }),
+    api<{ items: unknown[] }>('/api/catalogs', { query: { companyId, kind: 'SERVICE' } }),
+    api<{ items: unknown[] }>('/api/catalogs', { query: { companyId, kind: 'STATUS' } }),
+    api<{ items: unknown[] }>('/api/catalogs', { query: { companyId, kind: 'PAYMENT_METHOD' } }),
+    api<{ items: unknown[] }>('/api/cost-centers', { query: { companyId } }),
+    api<{ items: unknown[] }>('/api/fee-profiles', { query: { companyId } }),
+    api<{ items: unknown[] }>('/api/bank-accounts', { query: { companyId } }),
+    api<{ items: unknown[] }>('/api/custom-fields', { query: { companyId } }),
+  ])
+  const count = (r: PromiseSettledResult<{ items: unknown[] }>) => (r.status === 'fulfilled' ? r.value.items.length : 0)
+  sections[0].count = count(categorias)
+  sections[1].count = count(servicos)
+  sections[2].count = count(status)
+  sections[3].count = count(formas)
+  sections[4].count = count(centros)
+  sections[5].count = count(taxas)
+  sections[6].count = count(contas)
+  sections[7].count = count(campos)
+}
+
+onMounted(loadCounts)
+watch(() => company.activeId, loadCounts)
 </script>
 
 <template>

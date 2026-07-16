@@ -2,11 +2,17 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { navigateTo } from '#imports'
 import { useCompanyStore } from '../../stores/company'
+import { useSessionStore } from '../../stores/session'
 import { useAuth } from '../../composables/useAuth'
 
 const company = useCompanyStore()
+const session = useSessionStore()
 const { signOut } = useAuth()
 const darkMode = ref(false)
+
+const userDisplayName = computed(() => session.user?.email?.split('@')[0] ?? 'Usuário')
+const userInitials = computed(() => userDisplayName.value.slice(0, 2).toUpperCase())
+const userRoleLabel = computed(() => (session.isAdmin ? 'Administrador' : 'Membro'))
 
 const companyMenuRef = ref()
 const switchTarget = ref<{ id: string; name: string } | null>(null)
@@ -43,12 +49,8 @@ onMounted(() => {
 watch(darkMode, applyTheme)
 
 const notifRef = ref()
-const notifCount = ref(2)
-const notifications = ref([
-  { id: '1', icon: 'pi pi-clock', title: 'Vencimento amanhã — Juliana Costa', time: 'há 1 hora', read: false },
-  { id: '2', icon: 'pi pi-arrow-circle-down', title: 'Nova entrada lançada por Marcos Silva', time: 'há 3 horas', read: false },
-  { id: '3', icon: 'pi pi-check-circle', title: 'Fechamento de maio aprovado', time: 'há 2 dias', read: true },
-])
+const notifCount = ref(0)
+const notifications = ref<Array<{ id: string; icon: string; title: string; time: string; read: boolean }>>([])
 
 function markAllRead() {
   notifications.value.forEach(n => (n.read = true))
@@ -119,6 +121,9 @@ const profileItems = [
                 <Button label="Marcar tudo lido" text size="small" class="!text-xs" @click="markAllRead" />
               </div>
               <Divider class="!my-1" />
+              <p v-if="!notifications.length" class="py-4 text-center text-xs text-surface-400">
+                Nenhuma notificação
+              </p>
               <div
                 v-for="n in notifications"
                 :key="n.id"
@@ -148,14 +153,12 @@ const profileItems = [
             type="button"
             @click="profileMenuRef.toggle($event)"
           >
-            <img
-              src="https://i.pravatar.cc/150?img=3"
-              alt="Foto de perfil"
-              class="h-8 w-8 rounded-full object-cover ring-2 ring-surface-200 dark:ring-surface-700"
-            />
+            <span
+              class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-brand-100 text-xs font-bold text-brand-700 ring-2 ring-surface-200 dark:bg-brand-900/40 dark:text-brand-200 dark:ring-surface-700"
+            >{{ userInitials }}</span>
             <div class="hidden text-left leading-tight sm:block">
-              <strong class="block text-sm text-surface-900 dark:text-surface-0">Cleber C.</strong>
-              <span class="text-xs text-surface-500">Dono da firma</span>
+              <strong class="block max-w-[140px] truncate text-sm text-surface-900 dark:text-surface-0">{{ userDisplayName }}</strong>
+              <span class="text-xs text-surface-500">{{ userRoleLabel }}</span>
             </div>
             <i class="pi pi-chevron-down hidden text-[10px] text-surface-400 sm:block" />
           </button>

@@ -1,6 +1,6 @@
 import type { Prisma } from '@prisma/client'
 import { buildCustomSnapshot } from '../utils/customFields'
-import { periodClosedError, requireAuth, validateBody } from '../utils/http'
+import { apiError, periodClosedError, requireAuth, validateBody } from '../utils/http'
 import { withTenant } from '../utils/withTenant'
 import { createEntryBody } from '../utils/validators/entries'
 
@@ -10,7 +10,9 @@ export default defineEventHandler(async (event) => {
 
   return withTenant(auth.tenantId, async (tx) => {
     const period = await tx.period.findUnique({ where: { id: body.periodId } })
-    if (!period || period.status === 'CLOSED') throw periodClosedError()
+    if (!period) throw apiError(404, 'NOT_FOUND', 'Período não encontrado')
+    if (period.companyId !== body.companyId) throw apiError(400, 'COMPANY_PERIOD_MISMATCH', 'Período não pertence à empresa informada')
+    if (period.status === 'CLOSED') throw periodClosedError()
     const customSnapshot = await buildCustomSnapshot(tx, body.companyId, 'ENTRY', body.custom ?? {})
     const { custom, ...data } = body
     void custom

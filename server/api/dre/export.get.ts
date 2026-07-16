@@ -1,12 +1,18 @@
 import { toCsv } from '../../utils/csv'
 import { buildDre } from '../../utils/dre'
-import { requireAuth, validateQuery } from '../../utils/http'
+import { apiError, requireAuth, validateQuery } from '../../utils/http'
 import { withTenant } from '../../utils/withTenant'
 import { dreExportQuery } from '../../utils/validators/dre'
 
 export default defineEventHandler(async (event) => {
   const auth = requireAuth(event)
   const query = validateQuery(event, dreExportQuery)
+  // Export em PDF ainda não foi implementado (renderDrePdf é um stub) — falhar
+  // explicitamente em vez de devolver CSV silenciosamente no lugar do PDF pedido.
+  if (query.format === 'pdf') {
+    throw apiError(501, 'PDF_EXPORT_NOT_IMPLEMENTED', 'Exportação em PDF ainda não está disponível. Use o formato CSV.')
+  }
+
   const report = await withTenant(auth.tenantId, (tx) =>
     buildDre(tx, {
       companyId: query.companyId,

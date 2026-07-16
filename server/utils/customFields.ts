@@ -8,6 +8,7 @@
 // Reports preferem a definição VIVA (por fieldKey); campo removido cai no cache.
 // ============================================================================
 import type { Prisma, EntryKind } from '@prisma/client'
+import { apiError } from './http'
 
 export interface CustomSnapshotItem {
   fieldKey: string
@@ -16,11 +17,14 @@ export interface CustomSnapshotItem {
   _type: string
 }
 
+function isEmpty(value: unknown): boolean {
+  return value === null || value === undefined || value === ''
+}
+
 /**
  * Lê os CustomField ativos de (companyId, kind), valida obrigatórios e monta o
  * snapshot. DEVE rodar dentro de withTenant (recebe o tx).
- * TODO(§6): validar tipos (TEXT/NUMBER/CURRENCY/DATE/SELECT) e options de SELECT;
- *   lançar VALIDATION_ERROR em obrigatório ausente.
+ * TODO(§6): validar tipos (TEXT/NUMBER/CURRENCY/DATE/SELECT) e options de SELECT.
  */
 export async function buildCustomSnapshot(
   tx: Prisma.TransactionClient,
@@ -32,6 +36,11 @@ export async function buildCustomSnapshot(
     where: { companyId, kind, active: true },
     orderBy: { order: 'asc' },
   })
+  for (const f of fields) {
+    if (f.required && isEmpty(values[f.fieldKey])) {
+      throw apiError(422, 'VALIDATION_ERROR', `Campo obrigatório ausente: ${f.label}`)
+    }
+  }
   return fields.map((f) => ({
     fieldKey: f.fieldKey,
     value: values[f.fieldKey] ?? null,

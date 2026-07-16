@@ -9,7 +9,8 @@ export default defineEventHandler(async (event) => {
   const auth = requireAdmin(event)
   const body = await validateBody(event, createCompanyBody)
 
-  // Carrega o template de franquia (§13). TODO: validar nome de template permitido.
+  // Carrega o template de franquia (§13). `template` é um enum validado no zod
+  // (createCompanyBody) — nunca string livre — antes de virar path de arquivo.
   const template = JSON.parse(
     readFileSync(new URL(`../../prisma/seed/templates/${body.template}.json`, import.meta.url), 'utf8'),
   ) as FranchiseTemplate

@@ -60,28 +60,34 @@ async function createCompany() {
       modal
       :closable="false"
       :close-on-escape="false"
-      header="Bem-vindo! Vamos criar sua primeira empresa"
-      class="!w-[440px] !max-w-[96vw]"
+      :show-header="false"
+      class="!w-[440px] !max-w-[96vw] !rounded-2xl"
       :draggable="false"
     >
-      <form class="space-y-4" @submit.prevent="createCompany">
-        <p class="text-sm text-surface-500">
-          Ainda não existe nenhuma empresa cadastrada nesta conta. Crie a primeira empresa para começar a usar cadastros,
-          lançamentos e relatórios — nada pode ser salvo até que isso seja feito.
-        </p>
-        <Message v-if="createError" severity="error" size="small">{{ createError }}</Message>
-        <div class="flex flex-col gap-1.5">
-          <label class="text-xs font-semibold uppercase tracking-wide text-surface-500">Nome da empresa</label>
-          <InputText v-model="createForm.name" fluid autofocus />
+      <div class="px-2 pt-2">
+        <div class="mb-5 flex flex-col items-center text-center">
+          <span class="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-brand-50 dark:bg-brand-600/15">
+            <i class="pi pi-building text-2xl text-brand-600 dark:text-brand-300" />
+          </span>
+          <h1 class="text-xl font-bold text-surface-900 dark:text-surface-0">Vamos criar sua primeira empresa</h1>
+          <p class="mt-1.5 max-w-xs text-sm text-surface-400">
+            Nenhuma empresa cadastrada ainda — crie a primeira pra começar a usar cadastros, lançamentos e relatórios.
+          </p>
         </div>
-        <div class="flex flex-col gap-1.5">
-          <label class="text-xs font-semibold uppercase tracking-wide text-surface-500">Segmento</label>
-          <Select v-model="createForm.segment" :options="segmentOptions" option-label="label" option-value="value" editable fluid />
-        </div>
-      </form>
-      <template #footer>
-        <Button label="Criar empresa" :loading="creating" :disabled="!createForm.name.trim()" fluid @click="createCompany" />
-      </template>
+
+        <form class="space-y-4" @submit.prevent="createCompany">
+          <Message v-if="createError" severity="error" size="small" variant="simple">{{ createError }}</Message>
+          <div class="flex flex-col gap-1.5">
+            <label class="text-xs font-semibold uppercase tracking-wide text-surface-500">Nome da empresa</label>
+            <InputText v-model="createForm.name" placeholder="Ex.: Supervisão Vistorias" fluid autofocus />
+          </div>
+          <div class="flex flex-col gap-1.5">
+            <label class="text-xs font-semibold uppercase tracking-wide text-surface-500">Segmento</label>
+            <Select v-model="createForm.segment" :options="segmentOptions" option-label="label" option-value="value" editable fluid />
+          </div>
+          <Button type="submit" label="Criar empresa" :loading="creating" :disabled="!createForm.name.trim()" class="mt-2" fluid />
+        </form>
+      </div>
     </Dialog>
   </div>
 </template>

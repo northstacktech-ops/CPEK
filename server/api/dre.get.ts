@@ -12,7 +12,6 @@ export default defineEventHandler(async (event) => {
       companyId: query.companyId,
       year: query.year,
       mode: query.mode,
-      bankAccountIds: query.accounts,
     }),
   )
 })

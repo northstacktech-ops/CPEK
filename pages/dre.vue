@@ -1,65 +1,39 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import AppBreadcrumb from '../components/layout/AppBreadcrumb.vue'
 import PageHeader from '../components/layout/PageHeader.vue'
 import PageContent from '../components/layout/PageContent.vue'
+import { useCompanyStore } from '../stores/company'
+import type { DreRow } from '../types/dre'
 
-const year = ref(2026)
+const company = useCompanyStore()
+const { load } = useDre()
+
+const year = new Date().getFullYear()
 const modoRealizado = ref(true)
 const expandedRows = ref<Record<string, boolean>>({})
+const loading = ref(false)
+const error = ref<string | null>(null)
+const rows = ref<DreRow[]>([])
 
 const meses = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
-const mesAtual = 5 // junho (0-indexed)
+const mesAtual = new Date().getMonth() // mês corrente (0-indexed) — usado só pra "esmaecer" meses futuros no modo Realizado
 
-// Mock DRE data — ordem pedida pelo Cleber (reunião 07/2026):
-// Faturamento − Despesas Fixas − Despesas Variáveis = Resultado Final,
-// com Margem de Contribuição e Margem (%) movidas para DEPOIS do resultado.
-const rows = [
-  {
-    id: 'receita-op',
-    label: 'Faturamento (Receita Operacional)',
-    indent: 0,
-    bold: true,
-    sign: 1,
-    valores: [15200, 17000, 19300, 18500, 19420, 19420, 0, 0, 0, 0, 0, 0],
-    children: [
-      { id: 'cautelar', label: 'Cautelar', indent: 1, sign: 1, valores: [6800, 7500, 8200, 8000, 8500, 8500, 0, 0, 0, 0, 0, 0] },
-      { id: 'certicar', label: 'Certicar', indent: 1, sign: 1, valores: [5400, 6000, 7100, 6500, 7200, 7200, 0, 0, 0, 0, 0, 0] },
-      { id: 'constatacao', label: 'Constatação', indent: 1, sign: 1, valores: [3000, 3500, 4000, 4000, 3720, 3720, 0, 0, 0, 0, 0, 0] },
-    ],
-  },
-  {
-    id: 'despesas-fixas',
-    label: '(−) Despesas Fixas',
-    indent: 0,
-    bold: true,
-    sign: -1,
-    valores: [10900, 11500, 12600, 12100, 12820, 12820, 0, 0, 0, 0, 0, 0],
-    children: [
-      { id: 'aluguel', label: 'Aluguel', indent: 1, sign: -1, valores: [3200, 3200, 3200, 3200, 3200, 3200, 0, 0, 0, 0, 0, 0] },
-      { id: 'folha', label: 'Folha de Pagamento', indent: 1, sign: -1, valores: [6500, 7000, 8000, 7500, 8500, 8500, 0, 0, 0, 0, 0, 0] },
-      { id: 'mkt', label: 'Marketing', indent: 1, sign: -1, valores: [1200, 1300, 1400, 1400, 1120, 1120, 0, 0, 0, 0, 0, 0] },
-    ],
-  },
-  {
-    id: 'despesas-variaveis',
-    label: '(−) Despesas Variáveis',
-    indent: 0,
-    bold: true,
-    sign: -1,
-    valores: [2400, 2600, 2900, 2750, 3100, 3100, 0, 0, 0, 0, 0, 0],
-    children: [
-      { id: 'km', label: 'Combustível / KM', indent: 1, sign: -1, valores: [1200, 1300, 1500, 1400, 1600, 1600, 0, 0, 0, 0, 0, 0] },
-      { id: 'manutencao', label: 'Manutenção veicular', indent: 1, sign: -1, valores: [1200, 1300, 1400, 1350, 1500, 1500, 0, 0, 0, 0, 0, 0] },
-    ],
-  },
-  // Resultado = Faturamento − Fixas − Variáveis (15200−10900−2400=1900, ...)
-  { id: 'resultado-final', label: '= Resultado Final', indent: 0, bold: true, separator: true, highlight: true, sign: 1, valores: [1900, 2900, 3800, 3650, 3500, 3500, 0, 0, 0, 0, 0, 0] },
-  // Margens ao final, depois de todas as despesas (pedido do Cleber).
-  { id: 'margem', label: 'Margem de Contribuição', indent: 0, bold: true, separator: true, sign: 1, valores: [12800, 14400, 16400, 15750, 16320, 16320, 0, 0, 0, 0, 0, 0] },
-  { id: 'margem-pct', label: 'Margem de Contribuição (%)', indent: 1, sign: 1, percent: true, valores: [84, 85, 85, 85, 84, 84, 0, 0, 0, 0, 0, 0] },
-  { id: 'margem-liquida-pct', label: 'Margem Líquida (%)', indent: 1, sign: 1, percent: true, valores: [13, 17, 20, 20, 18, 18, 0, 0, 0, 0, 0, 0] },
-]
+async function refreshDre() {
+  if (!company.activeId) return
+  loading.value = true
+  error.value = null
+
+  try {
+    const report = await load(year, modoRealizado.value ? 'realizado' : 'agendado')
+    rows.value = report.rows
+  } catch (err) {
+    rows.value = []
+    error.value = apiErrorMessage(err, 'Não foi possível carregar o DRE. Tente novamente em instantes.')
+  } finally {
+    loading.value = false
+  }
+}
 
 function toggleRow(id: string) {
   expandedRows.value[id] = !expandedRows.value[id]
@@ -72,12 +46,41 @@ const brl = (v: number) => {
 
 const total = (valores: number[]) => valores.reduce((a, b) => a + b, 0)
 
-function isMuted(i: number) { return !modoRealizado.value ? false : i > mesAtual }
+function isMuted(i: number) { return modoRealizado.value ? i > mesAtual : false }
+
+function exportCSV() {
+  const header = ['Linha contábil', ...meses, 'Total']
+  const lines: string[][] = [header]
+  const pushRow = (row: DreRow, prefix = '') => {
+    const values = row.valores.map((v) => (row.percent ? `${v}%` : String(v)))
+    const totalCell = row.percent ? '' : String(total(row.valores))
+    lines.push([prefix + row.label, ...values, totalCell])
+    row.children?.forEach((child) => pushRow(child, '  '))
+  }
+  rows.value.forEach((row) => pushRow(row))
+  // Excel pt-BR: separador ';', BOM UTF-8 e CRLF (senão abre tudo numa coluna).
+  const csv = '﻿' + lines.map((line) => line.map((cell) => `"${cell.replaceAll('"', '""')}"`).join(';')).join('\r\n')
+  const anchor = document.createElement('a')
+  anchor.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }))
+  anchor.download = 'dre.csv'
+  anchor.click()
+}
+
+function exportPdf() {
+  error.value = 'Exportação em PDF ainda não está disponível. Use "Exportar CSV".'
+}
+
+watch(modoRealizado, () => void refreshDre())
+watch(() => company.activeId, () => void refreshDre())
+
+onMounted(() => {
+  void refreshDre()
+})
 </script>
 
 <template>
   <div>
-    <PageHeader title="DRE" description="Demonstrativo de Resultado · Ano 2026">
+    <PageHeader title="DRE" :description="`Demonstrativo de Resultado · Ano ${year}`">
       <template #breadcrumb>
         <AppBreadcrumb :items="[{ label: 'DRE' }]" />
       </template>
@@ -86,18 +89,22 @@ function isMuted(i: number) { return !modoRealizado.value ? false : i > mesAtual
           <span class="text-surface-500">Realizado</span>
           <ToggleSwitch v-model="modoRealizado" aria-label="Mostrar somente realizado" />
         </div>
-        <Button icon="pi pi-download" label="Exportar CSV" severity="secondary" outlined size="small" />
-        <Button icon="pi pi-file-pdf" label="PDF" severity="secondary" outlined size="small" />
+        <Button icon="pi pi-download" label="Exportar CSV" severity="secondary" outlined size="small" :disabled="loading || !rows.length" @click="exportCSV" />
+        <Button icon="pi pi-file-pdf" label="PDF" severity="secondary" outlined size="small" @click="exportPdf" />
       </template>
     </PageHeader>
 
     <PageContent>
+      <Message v-if="error" severity="error" size="small" class="col-span-12">{{ error }}</Message>
+
       <div class="col-span-12 overflow-x-auto">
-        <table class="w-full min-w-[900px] border-collapse text-sm">
+        <Skeleton v-if="loading" height="20rem" />
+
+        <table v-else class="w-full min-w-[900px] border-collapse text-sm">
           <thead>
             <tr class="border-b border-surface-200 dark:border-surface-800">
               <th class="py-2 pr-4 text-left text-xs font-bold uppercase tracking-wider text-surface-400" style="min-width:200px">Linha contábil</th>
-              <th v-for="(mes, i) in meses" :key="mes" class="py-2 px-2 text-right text-xs font-bold uppercase tracking-wider" :class="i > mesAtual && modoRealizado ? 'text-surface-300 dark:text-surface-700' : 'text-surface-400'">{{ mes }}</th>
+              <th v-for="(mes, i) in meses" :key="mes" class="py-2 px-2 text-right text-xs font-bold uppercase tracking-wider" :class="isMuted(i) ? 'text-surface-300 dark:text-surface-700' : 'text-surface-400'">{{ mes }}</th>
               <th class="py-2 pl-4 text-right text-xs font-bold uppercase tracking-wider text-surface-500">Total</th>
             </tr>
           </thead>
@@ -112,7 +119,7 @@ function isMuted(i: number) { return !modoRealizado.value ? false : i > mesAtual
               >
                 <td class="py-2.5 pr-4" :style="`padding-left: ${(row.indent ?? 0) * 16 + 4}px`">
                   <button
-                    v-if="row.children"
+                    v-if="row.children?.length"
                     class="flex items-center gap-1.5 font-semibold text-surface-900 dark:text-surface-0"
                     :class="row.bold ? 'font-bold' : ''"
                     @click="toggleRow(row.id)"
@@ -142,7 +149,7 @@ function isMuted(i: number) { return !modoRealizado.value ? false : i > mesAtual
                 </td>
               </tr>
               <!-- Children rows -->
-              <template v-if="row.children && expandedRows[row.id]">
+              <template v-if="row.children?.length && expandedRows[row.id]">
                 <tr
                   v-for="child in row.children"
                   :key="child.id"
@@ -161,14 +168,19 @@ function isMuted(i: number) { return !modoRealizado.value ? false : i > mesAtual
                 </tr>
               </template>
             </template>
+            <tr v-if="!loading && !rows.length">
+              <td :colspan="meses.length + 2" class="py-8 text-center text-sm text-surface-400">
+                Nenhum lançamento encontrado para {{ year }}.
+              </td>
+            </tr>
           </tbody>
         </table>
 
         <div class="mt-4 flex items-center gap-2 text-xs text-surface-400">
           <span class="inline-block h-2 w-2 rounded-full bg-brand-600" />
-          <span>Realizado (Jan–Jun)</span>
+          <span>Realizado (liquidado)</span>
           <span class="ml-3 inline-block h-2 w-2 rounded-full bg-surface-300" />
-          <span>Meses sem dados (Jul–Dez)</span>
+          <span>Meses futuros sem liquidação</span>
         </div>
       </div>
     </PageContent>

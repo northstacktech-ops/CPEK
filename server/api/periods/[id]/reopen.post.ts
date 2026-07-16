@@ -1,4 +1,3 @@
-import { demoPeriods, isDemoAuth } from '../../../utils/demo'
 import { writeAudit } from '../../../utils/audit'
 import { apiError, requireAdmin, validateBody } from '../../../utils/http'
 import { withTenant } from '../../../utils/withTenant'
@@ -9,12 +8,6 @@ export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id')
   if (!id) throw apiError(400, 'MISSING_ID', 'Id obrigatorio')
   await validateBody(event, closePeriodBody)
-  if (isDemoAuth(auth)) {
-    const period = demoPeriods.find((p) => p.id === id)
-    if (!period) throw apiError(404, 'NOT_FOUND', 'Período não encontrado')
-    period.status = 'OPEN'
-    return { item: period }
-  }
 
   return withTenant(auth.tenantId, async (tx) => {
     const item = await tx.period.update({

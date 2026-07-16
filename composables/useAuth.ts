@@ -7,9 +7,6 @@ import { usePeriodStore } from '../stores/period'
 import { useSessionStore } from '../stores/session'
 
 let _client: SupabaseClient | null = null
-const DEMO_ACCESS_TOKEN = 'demo-access-token'
-const DEMO_TENANT_ID = '00000000-0000-0000-0000-000000000001'
-const DEMO_STORAGE_KEY = 'cpek.demo.session'
 
 export function useSupabase(): SupabaseClient {
   if (_client) return _client
@@ -52,52 +49,12 @@ export function useAuth() {
   }
 
   async function signOut() {
-    if (session.accessToken && session.accessToken !== DEMO_ACCESS_TOKEN) {
-      await useSupabase().auth.signOut()
-    }
+    await useSupabase().auth.signOut()
     session.clear()
     company.clear()
     period.reset()
-    if (import.meta.client) localStorage.removeItem(DEMO_STORAGE_KEY)
     await navigateTo('/login')
   }
 
-  async function signInDemo() {
-    session.set({
-      user: {
-        id: '00000000-0000-0000-0000-000000000101',
-        email: 'demo@cpek.local',
-        role: 'ADMIN',
-      },
-      accessToken: DEMO_ACCESS_TOKEN,
-      tenantId: DEMO_TENANT_ID,
-    })
-
-    company.setCompanies([
-      {
-        id: '00000000-0000-0000-0000-000000000201',
-        name: 'Supervisão Vistorias SP',
-        segment: 'Vistoria Cautelar',
-      },
-      {
-        id: '00000000-0000-0000-0000-000000000202',
-        name: 'Supervisão Vistorias RJ',
-        segment: 'Vistoria Cautelar',
-      },
-    ])
-    company.setActive('00000000-0000-0000-0000-000000000201')
-    period.set(6, 2026)
-    if (import.meta.client) {
-      localStorage.setItem(
-        DEMO_STORAGE_KEY,
-        JSON.stringify({
-          activeCompanyId: company.activeId,
-          month: period.month,
-          year: period.year,
-        }),
-      )
-    }
-  }
-
-  return { signIn, signInDemo, signOut }
+  return { signIn, signOut }
 }

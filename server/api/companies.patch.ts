@@ -1,19 +1,11 @@
 // PATCH /api/companies - atualiza os dados principais da empresa ativa.
-import { demoCompanies, isDemoAuth } from '../utils/demo'
-import { apiError, requireAdmin, validateBody } from '../utils/http'
+import { requireAdmin, validateBody } from '../utils/http'
 import { updateCompanyBody } from '../utils/validators/companies'
 import { withTenant } from '../utils/withTenant'
 
 export default defineEventHandler(async (event) => {
   const auth = requireAdmin(event)
   const body = await validateBody(event, updateCompanyBody)
-
-  if (isDemoAuth(auth)) {
-    const current = demoCompanies.find((item) => item.id === body.id)
-    if (!current) throw apiError(404, 'COMPANY_NOT_FOUND', 'Empresa não encontrada')
-    Object.assign(current, body, { updatedAt: new Date().toISOString() })
-    return { item: current }
-  }
 
   return await withTenant(auth.tenantId, async (tx) => {
     const item = await tx.company.update({

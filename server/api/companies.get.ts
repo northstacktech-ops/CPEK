@@ -1,11 +1,9 @@
 // GET /api/companies - empresas do tenant.
-import { demoCompanies, isDemoAuth } from '../utils/demo'
 import { requireAuth } from '../utils/http'
 import { withTenant } from '../utils/withTenant'
 
 export default defineEventHandler(async (event) => {
   const auth = requireAuth(event)
-  if (isDemoAuth(auth)) return { items: demoCompanies }
 
   return await withTenant(auth.tenantId, async (tx) => {
     const items = await tx.company.findMany({

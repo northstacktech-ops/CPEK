@@ -1,4 +1,3 @@
-import { demoCustomFields, isDemoAuth } from '../../utils/demo'
 import { writeAudit } from '../../utils/audit'
 import { apiError, requireAuth, validateBody } from '../../utils/http'
 import { withTenant } from '../../utils/withTenant'
@@ -9,14 +8,6 @@ export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id')
   if (!id) throw apiError(400, 'MISSING_ID', 'Id obrigatorio')
   const body = await validateBody(event, updateCustomFieldBody)
-  if (isDemoAuth(auth)) {
-    const item = demoCustomFields.find((f) => f.id === id)
-    if (!item) throw apiError(404, 'NOT_FOUND', 'Campo não encontrado')
-    const { confirm, ...data } = body
-    void confirm
-    Object.assign(item, data)
-    return { item }
-  }
 
   const { confirm, ...data } = body
   void confirm

@@ -1,4 +1,3 @@
-import { demoDashboard, isDemoAuth } from '../utils/demo'
 import { requireAuth, validateQuery } from '../utils/http'
 import { withTenant } from '../utils/withTenant'
 import { dashboardQuery } from '../utils/validators/dashboard'
@@ -27,7 +26,6 @@ function emptyDashboard(year: number) {
 export default defineEventHandler(async (event) => {
   const auth = requireAuth(event)
   const query = validateQuery(event, dashboardQuery)
-  if (isDemoAuth(auth)) return demoDashboard
 
   const now = new Date()
   const month = query.month ?? (query.from ? query.from.getMonth() + 1 : now.getMonth() + 1)

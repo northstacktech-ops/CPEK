@@ -12,7 +12,6 @@
 // ============================================================================
 import { JwtError } from '../utils/jwt'
 import { resolveAuthContext } from '../utils/authVerify'
-import { demoAuthContext, isDemoToken } from '../utils/demo'
 
 const PUBLIC_PREFIXES = ['/api/health', '/api/auth']
 
@@ -27,11 +26,6 @@ export default defineEventHandler(async (event) => {
   const token = header.startsWith('Bearer ') ? header.slice(7) : null
   if (!token) {
     throw createError({ statusCode: 401, statusMessage: 'Não autenticado' })
-  }
-
-  if (isDemoToken(token)) {
-    event.context.auth = demoAuthContext()
-    return
   }
 
   try {

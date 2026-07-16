@@ -9,8 +9,7 @@ const email = ref('')
 const password = ref('')
 const error = ref<string | null>(null)
 const loading = ref(false)
-const loadingDemo = ref(false)
-const { signIn, signInDemo } = useAuth()
+const { signIn } = useAuth()
 
 async function onSubmit() {
   error.value = null
@@ -22,19 +21,6 @@ async function onSubmit() {
     error.value = (e as Error).message ?? 'Falha no login'
   } finally {
     loading.value = false
-  }
-}
-
-async function onDemoAccess() {
-  error.value = null
-  loadingDemo.value = true
-  try {
-    await signInDemo()
-    await navigateTo('/')
-  } catch (e) {
-    error.value = (e as Error).message ?? 'Falha ao acessar demo'
-  } finally {
-    loadingDemo.value = false
   }
 }
 </script>
@@ -95,20 +81,6 @@ async function onDemoAccess() {
 
           <Button type="submit" label="Entrar" :loading="loading" class="mt-2" fluid />
         </form>
-
-        <Divider align="center" class="my-4">
-          <span class="text-xs text-surface-400">ou</span>
-        </Divider>
-
-        <Button
-          type="button"
-          label="Acesso teste"
-          icon="pi pi-play"
-          severity="success"
-          :loading="loadingDemo"
-          fluid
-          @click="onDemoAccess"
-        />
 
         <p class="mt-6 text-center text-xs text-surface-400">
           Acesso restrito a franqueados da rede Supervisão.

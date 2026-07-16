@@ -1,4 +1,3 @@
-import { demoBankAccounts, isDemoAuth } from '../utils/demo'
 import { requireAuth, validateQuery } from '../utils/http'
 import { withTenant } from '../utils/withTenant'
 import { listBankAccountsQuery } from '../utils/validators/bankAccounts'
@@ -6,7 +5,6 @@ import { listBankAccountsQuery } from '../utils/validators/bankAccounts'
 export default defineEventHandler(async (event) => {
   const auth = requireAuth(event)
   const query = validateQuery(event, listBankAccountsQuery)
-  if (isDemoAuth(auth)) return { items: demoBankAccounts }
 
   return withTenant(auth.tenantId, async (tx) => {
     const [accounts, entries, exits, closings] = await Promise.all([

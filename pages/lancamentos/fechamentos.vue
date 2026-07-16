@@ -325,7 +325,7 @@ onMounted(() => {
           <Select v-model="statusFilter" :options="statusOptions" placeholder="Status" show-clear size="small" class="w-full md:w-40" />
         </div>
 
-        <TableSkeleton v-if="loading" :rows="6" :columns="6" />
+        <UiTableSkeleton v-if="loading" :rows="6" :columns="6" />
 
         <DataTable v-else :value="filtered" data-key="id" paginator :rows="8" size="small" class="cpek-table">
           <Column field="cliente" header="Cliente" sortable />

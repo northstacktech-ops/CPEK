@@ -110,7 +110,7 @@ onMounted(() => {
       <Message v-if="error" severity="error" size="small" class="col-span-12">{{ error }}</Message>
 
       <div class="col-span-12">
-        <TableSkeleton v-if="loading" :rows="6" :columns="4" />
+        <UiTableSkeleton v-if="loading" :rows="6" :columns="4" />
 
         <DataTable v-else :value="orderedItems" data-key="id" size="small" class="cpek-table">
           <Column field="label" header="Nome" sortable />

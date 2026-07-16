@@ -235,7 +235,7 @@ onMounted(() => {
             </IconField>
           </div>
 
-          <TableSkeleton v-if="loading" :rows="6" :columns="6" />
+          <UiTableSkeleton v-if="loading" :rows="6" :columns="6" />
 
           <DataTable
             v-else

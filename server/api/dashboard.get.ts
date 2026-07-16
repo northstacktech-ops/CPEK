@@ -1,4 +1,4 @@
-import { requireAuth, validateQuery } from '../utils/http'
+import { apiError, requireAuth, validateQuery } from '../utils/http'
 import { withTenant } from '../utils/withTenant'
 import { dashboardQuery } from '../utils/validators/dashboard'
 
@@ -108,7 +108,10 @@ export default defineEventHandler(async (event) => {
         })),
       }
     })
-  } catch {
-    return emptyDashboard(year)
+  } catch (err) {
+    // Nunca mostrar R$ 0,00 fingindo sucesso quando a consulta realmente falhou
+    // (RLS, conexão, bug) — o usuário precisa saber que os dados não carregaram.
+    if (err && typeof err === 'object' && 'statusCode' in err) throw err
+    throw apiError(500, 'DASHBOARD_ERROR', 'Não foi possível calcular os dados do painel. Tente novamente em instantes.')
   }
 })

@@ -11,6 +11,7 @@
 // Em ambos os casos, tenant_id/role vêm de app_metadata — nunca do client.
 // ============================================================================
 import { JwtError, toAuthContext, verifySupabaseJwt, type AuthContext } from './jwt'
+import { apiError } from './http'
 
 interface SupabaseUserResponse {
   id: string
@@ -31,7 +32,7 @@ export async function resolveAuthContext(token: string): Promise<AuthContext> {
   const url = config.public.supabaseUrl as string | undefined
   const anon = config.public.supabaseAnonKey as string | undefined
   if (!url || !anon) {
-    throw createError({ statusCode: 500, statusMessage: 'Supabase Auth não configurado' })
+    throw apiError(500, 'CONFIG_ERROR', 'Supabase Auth não configurado no servidor')
   }
 
   let user: SupabaseUserResponse

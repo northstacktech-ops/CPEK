@@ -10,7 +10,7 @@ import type { AuthContext } from './jwt'
 /** Garante autenticação e retorna o contexto (tenantId/role do JWT). */
 export function requireAuth(event: H3Event): AuthContext {
   const auth = event.context.auth
-  if (!auth) throw createError({ statusCode: 401, statusMessage: 'Não autenticado' })
+  if (!auth) throw apiError(401, 'UNAUTHENTICATED', 'Não autenticado. Faça login novamente.')
   return auth
 }
 

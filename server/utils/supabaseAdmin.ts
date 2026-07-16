@@ -6,6 +6,7 @@
 // ============================================================================
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import type { Role } from '@prisma/client'
+import { apiError } from './http'
 
 let _admin: SupabaseClient | null = null
 
@@ -15,7 +16,7 @@ export function supabaseAdmin(): SupabaseClient {
   const url = config.public.supabaseUrl
   const serviceKey = config.supabaseServiceRoleKey
   if (!url || !serviceKey) {
-    throw createError({ statusCode: 500, statusMessage: 'Supabase admin não configurado' })
+    throw apiError(500, 'CONFIG_ERROR', 'Supabase admin não configurado no servidor')
   }
   _admin = createClient(url as string, serviceKey as string, {
     auth: { autoRefreshToken: false, persistSession: false },
@@ -35,6 +36,6 @@ export async function setUserClaims(
     app_metadata: { account_id: claims.account_id, role: claims.role },
   })
   if (error) {
-    throw createError({ statusCode: 500, statusMessage: `Falha ao gravar claims: ${error.message}` })
+    throw apiError(500, 'SUPABASE_ADMIN_ERROR', `Falha ao gravar claims: ${error.message}`)
   }
 }

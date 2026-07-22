@@ -282,10 +282,10 @@ const brl = (value: number) => value.toLocaleString('pt-BR', { style: 'currency'
           <span>Contas bancárias</span>
         </template>
         <template #content>
-          <div class="relative mb-3">
-            <i class="pi pi-search pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-surface-400" />
-            <InputText v-model="accountSearch" placeholder="Buscar conta" size="small" class="w-full pl-9" />
-          </div>
+          <IconField class="mb-3 w-full">
+            <InputIcon class="pi pi-search" />
+            <InputText v-model="accountSearch" placeholder="Buscar conta" size="small" fluid />
+          </IconField>
           <UiTableSkeleton v-if="loading" :rows="5" :columns="2" />
 
           <DataTable

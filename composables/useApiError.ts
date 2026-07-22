@@ -31,5 +31,10 @@ export function apiErrorMessage(err: unknown, fallback: string): string {
   // Rede de segurança: qualquer erro do servidor que não usou apiError() ainda
   // assim tem `statusMessage`/`message` — melhor mostrar isso que o fallback genérico.
   if (envelope?.message) return envelope.message
+  // Erros que não vieram de uma resposta de API (ex.: AuthError do Supabase,
+  // ou um `throw new Error(...)` de validação no client) não têm `.data` — o
+  // próprio `.message` já é a informação específica, não um envelope genérico.
+  const topMessage = (err as { message?: string } | undefined)?.message
+  if (topMessage) return topMessage
   return fallback
 }

@@ -2,6 +2,7 @@
 import { ref } from 'vue'
 import { definePageMeta, navigateTo } from '#imports'
 import { useAuth } from '../composables/useAuth'
+import { apiErrorMessage } from '../composables/useApiError'
 
 definePageMeta({ layout: 'auth' })
 
@@ -18,7 +19,7 @@ async function onSubmit() {
     await signIn(email.value, password.value)
     await navigateTo('/')
   } catch (e) {
-    error.value = (e as Error).message ?? 'Falha no login'
+    error.value = apiErrorMessage(e, 'Falha no login. Tente novamente.')
   } finally {
     loading.value = false
   }

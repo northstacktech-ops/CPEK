@@ -22,8 +22,11 @@ Gestão financeira multiunidade · multi-tenant · Vue 3 + Nuxt 3 · Supabase/Po
 > falhando com "supabaseUrl is required." no login.
 
 ```env
-# Runtime — pooler Supavisor (papel cpek_app, submetido ao RLS)
-DATABASE_URL="postgresql://cpek_app:${CPEK_APP_DB_PASSWORD}@<proj>.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=1"
+# Runtime — Shared Pooler/Supavisor (papel cpek_app, submetido ao RLS). Usuário
+# leva ".<project_ref>", e "aws-N-" varia por projeto — pegue a string exata em
+# Dashboard → Connect → aba "Transaction pooler" (NUNCA "Direct connection":
+# essa é IPv6-only e não funciona a partir de serverless, ex.: Vercel).
+DATABASE_URL="postgresql://cpek_app.<project_ref>:${CPEK_APP_DB_PASSWORD}@aws-N-<região>.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=5"
 # Migrations — conexão direta (papel postgres)
 DIRECT_URL="postgresql://postgres:<senha>@db.<proj>.supabase.co:5432/postgres"
 

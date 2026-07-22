@@ -7,32 +7,48 @@ export default defineEventHandler(async (event) => {
   const query = validateQuery(event, listBankAccountsQuery)
 
   return withTenant(auth.tenantId, async (tx) => {
-    const [accounts, entries, exits, closings] = await Promise.all([
+    // Soma por conta feita no banco (groupBy) em vez de trazer todo o histórico
+    // de lançamentos pra memória e somar em JS — o histórico só cresce com o
+    // tempo, então isso mantém o endpoint rápido independente do volume.
+    const [accounts, entryTotals, exitTotals, closingTotals] = await Promise.all([
       tx.bankAccount.findMany({
         where: { companyId: query.companyId, active: true },
         orderBy: { name: 'asc' },
       }),
-      tx.entry.findMany({ where: { companyId: query.companyId, dataPagamento: { not: null } } }),
-      tx.exit.findMany({ where: { companyId: query.companyId, dataPagamento: { not: null } } }),
-      tx.closing.findMany({ where: { companyId: query.companyId, dataRecebimento: { not: null } } }),
+      tx.entry.groupBy({
+        by: ['bankAccountId'],
+        where: { companyId: query.companyId, dataPagamento: { not: null }, bankAccountId: { not: null } },
+        _sum: { valorServico: true, deslocamento: true },
+      }),
+      tx.exit.groupBy({
+        by: ['bankAccountId'],
+        where: { companyId: query.companyId, dataPagamento: { not: null }, bankAccountId: { not: null } },
+        _sum: { valorDespesa: true },
+      }),
+      tx.closing.groupBy({
+        by: ['bankAccountId'],
+        where: { companyId: query.companyId, dataRecebimento: { not: null }, bankAccountId: { not: null } },
+        _sum: { valorFechamento: true },
+      }),
     ])
 
+    const entryByAccount = new Map(entryTotals.map((t) => [t.bankAccountId, t]))
+    const exitByAccount = new Map(exitTotals.map((t) => [t.bankAccountId, t]))
+    const closingByAccount = new Map(closingTotals.map((t) => [t.bankAccountId, t]))
+
     const items = accounts.map((account) => {
-      const entryTotal = entries
-        .filter((entry) => entry.bankAccountId === account.id)
-        .reduce((total, entry) => total + Number(entry.valorServico) + Number(entry.deslocamento), 0)
-      const exitTotal = exits
-        .filter((exit) => exit.bankAccountId === account.id)
-        .reduce((total, exit) => total + Number(exit.valorDespesa), 0)
-      const closingTotal = closings
-        .filter((closing) => closing.bankAccountId === account.id)
-        .reduce((total, closing) => total + Number(closing.valorFechamento), 0)
+      const entryTotal = entryByAccount.get(account.id)
+      const exitTotal = exitByAccount.get(account.id)
+      const closingTotal = closingByAccount.get(account.id)
+      const entrySum = Number(entryTotal?._sum.valorServico ?? 0) + Number(entryTotal?._sum.deslocamento ?? 0)
+      const closingSum = Number(closingTotal?._sum.valorFechamento ?? 0)
+      const exitSum = Number(exitTotal?._sum.valorDespesa ?? 0)
 
       return {
         id: account.id,
         bankAccountId: account.id,
         name: account.name,
-        balance: Number(account.openingBalance) + entryTotal + closingTotal - exitTotal,
+        balance: Number(account.openingBalance) + entrySum + closingSum - exitSum,
       }
     })
 

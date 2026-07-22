@@ -177,6 +177,13 @@ export default defineNuxtConfig({
       external: ['@prisma/client', '.prisma/client', 'prisma'],
     },
     compressPublicAssets: true,
+    // Projeto Supabase roda em sa-east-1 (São Paulo) — sem isso, a função
+    // serverless da Vercel sobe na região default (iad1, Virgínia) e toda
+    // query paga round-trip intercontinental. gru1 é a região da Vercel em
+    // São Paulo. Exige plano Vercel Pro (Hobby não permite escolher região).
+    vercel: {
+      regions: ['gru1'],
+    },
   },
 
   routeRules: {

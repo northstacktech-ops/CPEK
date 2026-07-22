@@ -134,13 +134,35 @@ Regras, em ordem de importância:
 ### 4.4 Conexão serverless
 
 ```env
-# runtime (pooler Supavisor, transaction mode)
-DATABASE_URL="postgresql://cpek_app:***@<proj>.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=1"
+# runtime (Shared Pooler/Supavisor, transaction mode)
+DATABASE_URL="postgresql://cpek_app.<project_ref>:***@aws-N-<região>.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=5"
 # migrations (conexão direta)
 DIRECT_URL="postgresql://postgres:***@db.<proj>.supabase.co:5432/postgres"
 ```
 
 `pgbouncer=true` desliga prepared statements (necessário no pooler). Migrations **nunca** pelo pooler.
+
+**Atenção ao formato do runtime:** o usuário leva `.{project_ref}` (não é só
+`cpek_app`), e o host `aws-N-{região}` tem um índice de nó (`N`) que **varia por
+projeto** — não dá pra adivinhar, pegue a string exata em Dashboard → Connect →
+aba **"Transaction pooler"**. É fácil confundir com a aba "Direct connection"
+(`db.<ref>.supabase.co`), que parece similar mas é **IPv6-only** — funciona de
+um ambiente com saída IPv6 (a maioria das máquinas dev), mas **não funciona a
+partir de serverless** (Vercel não tem saída IPv6 nas funções, só lançou
+"Static IPs" para IPv4). O sintoma é `Can't reach database server` em
+produção mesmo com tudo certo localmente — já aconteceu neste projeto.
+
+`connection_limit=5` (não 1): cada `withTenant()` abre uma transação, e uma
+transação ocupa uma conexão inteira até o commit — `connection_limit=1` fazia
+toda chamada concorrente (duas abas, dois usuários, dois handlers em paralelo)
+esperar na fila da única conexão, o que se manifestava como lentidão (ou,
+depois de esgotado o `maxWait`, como erro "Unable to start a transaction in
+the given time"). Medido: 5 requisições concorrentes caíram de ~4.6s para
+~1.7s ao subir de 1 para 5. Isso não acelera as queries paralelas *dentro* de
+um único handler (o `Promise.all` de um `withTenant` continua serializado na
+mesma conexão/transação — inerente ao desenho de RLS via `set_config` local à
+transação, não dá pra abrir mão disso sem reabrir risco de vazamento de
+tenant); o ganho é para requisições concorrentes de handlers diferentes.
 
 ### 4.5 Resolução de tenant centralizada (habilita a escala da V2)
 

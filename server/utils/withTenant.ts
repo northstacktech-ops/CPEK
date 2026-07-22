@@ -25,10 +25,18 @@ export function withTenant<T>(
         await tx.$executeRaw`select set_config('app.current_tenant', ${tenantId}, true)`
         return fn(tx as unknown as Prisma.TransactionClient)
       },
-      // Default do Prisma é 5s — margem curta para handlers com várias queries em
-      // sequência (ex.: aplicar template de franquia). 15s dá folga sem mascarar
-      // uma transação genuinamente presa.
-      { timeout: 15_000 },
+      {
+        // Default do Prisma é 5s — margem curta para handlers com várias queries em
+        // sequência (ex.: aplicar template de franquia). 15s dá folga sem mascarar
+        // uma transação genuinamente presa.
+        timeout: 15_000,
+        // DATABASE_URL roda com connection_limit=1 (§4.4 — uma conexão por instância
+        // serverless via pooler Supavisor): é esperado que requisições concorrentes
+        // fiquem na fila esperando a única conexão liberar. O default do Prisma pra
+        // maxWait é 2s — curto demais aqui, e o request perdedor da fila cai com
+        // "Unable to start a transaction in the given time" mesmo sem nada errado.
+        maxWait: 10_000,
+      },
     ),
   )
 }

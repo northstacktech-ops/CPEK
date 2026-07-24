@@ -48,9 +48,7 @@
   ],
   "customFields": {
     "ENTRY": [
-      { "fieldKey": "placa", "label": "Placa", "dataType": "TEXT", "required": false, "order": 1 },
-      { "fieldKey": "modelo", "label": "Modelo", "dataType": "TEXT", "required": false, "order": 2 },
-      { "fieldKey": "renavam", "label": "RENAVAM", "dataType": "TEXT", "required": false, "order": 3 }
+      { "fieldKey": "renavam", "label": "RENAVAM", "dataType": "TEXT", "required": false, "order": 1 }
     ]
   }
 }

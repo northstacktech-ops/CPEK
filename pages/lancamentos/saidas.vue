@@ -116,7 +116,11 @@ const filtered = computed(() => {
   if (statusFilter.value) result = result.filter((exit) => exit.status === statusFilter.value)
   if (centroCustoFilter.value) result = result.filter((exit) => exit.centroCusto === centroCustoFilter.value)
   const q = search.value.trim().toLowerCase()
-  if (q) result = result.filter((exit) => `${exit.fornecedor} ${exit.categoria} ${exit.status}`.toLowerCase().includes(q))
+  if (q) {
+    result = result.filter((exit) =>
+      `${exit.fornecedor} ${exit.categoria} ${exit.status} ${customColumnValue(exit.raw)}`.toLowerCase().includes(q),
+    )
+  }
   return result
 })
 

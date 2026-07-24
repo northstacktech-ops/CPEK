@@ -141,7 +141,11 @@ const filtered = computed(() => {
   let result = entries.value
   if (statusFilter.value) result = result.filter((entry) => entry.status === statusFilter.value)
   const q = search.value.trim().toLowerCase()
-  if (q) result = result.filter((entry) => `${entry.cliente} ${entry.servico} ${entry.status}`.toLowerCase().includes(q))
+  if (q) {
+    result = result.filter((entry) =>
+      `${entry.cliente} ${entry.servico} ${entry.status} ${customColumnValue(entry.raw)}`.toLowerCase().includes(q),
+    )
+  }
   return result
 })
 

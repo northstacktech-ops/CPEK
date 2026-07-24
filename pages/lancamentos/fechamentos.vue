@@ -101,7 +101,11 @@ const filtered = computed(() => {
   let result = closings.value
   if (statusFilter.value) result = result.filter((closing) => closing.status === statusFilter.value)
   const q = search.value.trim().toLowerCase()
-  if (q) result = result.filter((closing) => `${closing.cliente} ${closing.status}`.toLowerCase().includes(q))
+  if (q) {
+    result = result.filter((closing) =>
+      `${closing.cliente} ${closing.status} ${customColumnValue(closing.raw)}`.toLowerCase().includes(q),
+    )
+  }
   return result
 })
 

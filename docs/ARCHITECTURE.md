@@ -36,8 +36,8 @@ Sistema web de gestão financeira **multiunidade e multi-tenant** para franquead
 
 Faz quatro coisas:
 1. **Lançar** entradas, saídas e fechamentos (boletos) com campos configuráveis por empresa.
-2. **Consolidar** num dashboard com cards, contas bancárias e fluxo de caixa.
-3. **Fechar** períodos mensais (trava edição) e gerar **DRE contábil** por tipo de serviço.
+2. **Consolidar** num dashboard com cards e fluxo de caixa.
+3. **Gerir períodos automaticamente** (mês resolvido pela data do lançamento, sem passo manual; data futura é bloqueada) e gerar **DRE contábil** por tipo de serviço.
 4. **Exportar** em CSV e PDF.
 
 Nasce multi-tenant para, em **V2**, virar SaaS licenciável às ~200 unidades da rede (onboarding por template + billing).
@@ -49,7 +49,7 @@ Nasce multi-tenant para, em **V2**, virar SaaS licenciável às ~200 unidades da
 ## 2. Princípios de arquitetura
 
 1. **Isolamento por tenant é invariante de segurança, com comportamento *fail-closed*.** RLS no banco + tenant guard na aplicação. Sem tenant na sessão, o banco **não retorna nada** (não retorna "tudo"). Nenhuma query de negócio sai sem tenant.
-2. **Histórico é imutável.** Snapshot JSON nos lançamentos; desativação em vez de exclusão; período fechado trava edição.
+2. **Histórico é imutável.** Snapshot JSON nos lançamentos; desativação em vez de exclusão; lançamento com data futura é bloqueado.
 3. **Servidor é a autoridade.** Toda validação e todo cálculo financeiro no Nitro. Frontend nunca é fonte de verdade nem de segurança.
 4. **Dinheiro é `Decimal(14,2)`.** Nunca `Float`. Arredondamento explícito no DRE.
 5. **MVP enxuto; V2 já comportada pelo modelo.** Billing e onboarding SaaS ficam fora do código agora, mas o schema (Account como raiz) e a resolução centralizada de tenant não mudam para suportá-los.
@@ -260,7 +260,7 @@ Receita Operacional            Σ dreGroup=OPERATING_REVENUE  (quebra por servic
 
 ## 8. Contrato de API (Nitro)
 
-Convenções: todas autenticadas; `companyId` validado contra o tenant; toda mutação em `withTenant`; erros `{ error: { code, message } }`; período fechado → `409 PERIOD_CLOSED`.
+Convenções: todas autenticadas; `companyId` validado contra o tenant; toda mutação em `withTenant`; erros `{ error: { code, message } }`; data de lançamento futura → `422 FUTURE_DATE`.
 
 | Método | Rota | Descrição |
 |---|---|---|
@@ -270,8 +270,8 @@ Convenções: todas autenticadas; `companyId` validado contra o tenant; toda mut
 | `GET` | `/api/dashboard?companyId&from&to` | 5 cards + fluxo acumulado |
 | `GET` | `/api/entries?companyId&periodId&page` | Listar entradas |
 | `POST` | `/api/entries` | Criar entrada (valida fixos+custom, grava snapshot) |
-| `PATCH` | `/api/entries/:id` | Editar (409 se período fechado) |
-| `DELETE` | `/api/entries/:id` | Excluir (409 se fechado; audit) |
+| `PATCH` | `/api/entries/:id` | Editar |
+| `DELETE` | `/api/entries/:id` | Excluir (audit) |
 | `GET` | `/api/entries/export?…&format=csv` | Export CSV |
 | `…` | `/api/exits/*`, `/api/closings/*` | Idêntico, por tipo |
 | `GET` | `/api/dre?companyId&year&mode=realizado\|agendado&accounts=` | DRE contábil |
@@ -280,7 +280,7 @@ Convenções: todas autenticadas; `companyId` validado contra o tenant; toda mut
 | `GET/POST/PATCH/DELETE` | `/api/catalogs/*` | Forma de pagamento, serviço, status, categoria |
 | `…` | `/api/cost-centers/*`, `/api/fee-profiles/*` | Centro de custo, taxas/juros |
 | `GET/POST/PATCH/DELETE` | `/api/custom-fields/*` | Campos custom (confirmação + audit) |
-| `POST` | `/api/periods/:id/close` · `/reopen` | Fechar/reabrir período (admin) → audit |
+| `GET/POST` | `/api/periods` | Período mensal, resolvido automaticamente pela data do lançamento |
 | `GET/POST/PATCH` | `/api/settings/members/*` | Convites e papéis (admin) |
 
 Validação de payload com **zod** em `server/utils/validators/*`.
@@ -383,8 +383,8 @@ Filtros: período (mês/ano), tipo de lançamento, empresa ativa.
 - [ ] **Cliente Prisma base proibido em `server/api/**`** (lint/teste de arquitetura) — §4.3.
 - [ ] Validação de payload no servidor (zod) em toda rota.
 - [ ] HTTPS; segredos só em env da Vercel / `.env.local`; `service_role` só no servidor.
-- [ ] `AuditLog` em: fechar/reabrir período, excluir lançamento, alterar campo custom.
-- [ ] Período fechado → 409 no servidor.
+- [ ] `AuditLog` em: excluir lançamento, alterar campo custom.
+- [ ] Data futura → 422 no servidor.
 - [ ] **Teste de isolamento RLS em matriz** verde no CI (gate de merge) — §15.
 
 ---
@@ -394,7 +394,7 @@ Filtros: período (mês/ano), tipo de lançamento, empresa ativa.
 | Camada | Ferramenta | Foco |
 |---|---|---|
 | Unit | Vitest | motor de DRE, snapshot de campos custom, fórmulas do dashboard |
-| Integração | Vitest + DB de teste | **isolamento RLS em matriz**, *fail-closed*, bloqueio de período fechado |
+| Integração | Vitest + DB de teste | **isolamento RLS em matriz**, *fail-closed*, bloqueio de data futura |
 | E2E | Playwright | fluxos completos **+ verificação de vazamento por endpoint** |
 
 ### 15.1 Isolamento em matriz (não-negociável)
@@ -489,10 +489,10 @@ Sair de 1:1 para N:N depois **mexe em auth e em todas as queries**, então a dec
 - **DoD:** lançar reflete no dashboard; remover campo custom não quebra histórico; editar label propaga.
 
 ### Fase 3 — Fechamento + DRE
-- [ ] Fechamento (boletos) + fechar/reabrir período (trava + audit).
-- [ ] Motor de DRE contábil (por serviço, realizado×agendado, filtro por contas, linhas expansíveis).
+- [ ] Fechamento (boletos) + período automático com bloqueio de data futura.
+- [ ] Motor de DRE contábil (por serviço, realizado×agendado, linhas expansíveis).
 - [ ] Export PDF (vue-pdf) e CSV do DRE.
-- **DoD:** DRE bate com lançamentos; período fechado bloqueia edição; export nos dois formatos.
+- **DoD:** DRE bate com lançamentos; data futura bloqueia lançamento; export nos dois formatos.
 
 ### Fase 4 — Configurações + polimento
 - [ ] Conta, empresas, auditoria. (Membros removido do escopo — acesso único por conta, decisão 2026-07-06.)
@@ -524,8 +524,8 @@ Sair de 1:1 para N:N depois **mexe em auth e em todas as queries**, então a dec
 |---|---|
 | Tenant / Account | Conta do franqueado — raiz do isolamento |
 | Company | Empresa/unidade dentro da conta |
-| Period | Mês de uma empresa (aberto/fechado) |
-| Fechamento | Recebimento consolidado de boletos/faturas (≠ "fechar período") |
+| Period | Mês de uma empresa, resolvido automaticamente pela data do lançamento |
+| Fechamento | Recebimento consolidado de boletos/faturas |
 | DRE | Demonstrativo contábil gerencial por período |
 | dreGroup | Linha contábil à qual uma categoria pertence |
 | Snapshot JSON | Cópia imutável dos campos custom no lançamento |

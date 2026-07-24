@@ -27,11 +27,6 @@ enum EntryKind {
   CLOSING // fechamento (boleto/fatura consolidada)
 }
 
-enum PeriodStatus {
-  OPEN
-  CLOSED
-}
-
 enum ContactType {
   CLIENT
   SUPPLIER
@@ -262,14 +257,11 @@ model CustomField {
 
 // ───────────────────────────── Período ─────────────────────────────
 model Period {
-  id         String       @id @default(uuid()) @db.Uuid
-  tenantId   String       @map("tenant_id") @db.Uuid
-  companyId  String       @map("company_id") @db.Uuid
-  month      Int // 1..12
-  year       Int
-  status     PeriodStatus @default(OPEN)
-  closedAt   DateTime?    @map("closed_at")
-  closedById String?      @map("closed_by_id") @db.Uuid
+  id        String @id @default(uuid()) @db.Uuid
+  tenantId  String @map("tenant_id") @db.Uuid
+  companyId String @map("company_id") @db.Uuid
+  month     Int // 1..12
+  year      Int
 
   company  Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
   entries  Entry[]

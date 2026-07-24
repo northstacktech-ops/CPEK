@@ -19,6 +19,21 @@ interface ContactOption {
   active?: boolean
 }
 
+interface CustomFieldOption {
+  fieldKey: string
+  label: string
+  active?: boolean
+}
+
+interface CustomSnapshotItem {
+  fieldKey: string
+  value: unknown
+  _label: string
+  _type: string
+}
+
+const PLACA_FIELD = '__fixed_placa__'
+
 interface EntryRecord {
   id: string
   data?: string
@@ -76,6 +91,8 @@ const statuses = ref<CatalogOption[]>([])
 const payments = ref<CatalogOption[]>([])
 const clients = ref<ContactOption[]>([])
 const entries = ref<EntryRow[]>([])
+const customFieldDefs = ref<CustomFieldOption[]>([])
+const displayField = ref<string>(PLACA_FIELD)
 
 const form = ref({
   valor: null as number | null,
@@ -105,6 +122,12 @@ const servicoOptions = computed(() => services.value.map((item) => item.label))
 const categoriaOptions = computed(() => categories.value.map((item) => item.label))
 const pagamentoOptions = computed(() => payments.value.map((item) => item.label))
 const clienteOptions = computed(() => clients.value.map((item) => item.name))
+
+const displayFieldOptions = computed(() => [
+  { value: PLACA_FIELD, label: 'Placa' },
+  ...customFieldDefs.value.map((f) => ({ value: f.fieldKey, label: f.label })),
+])
+const displayFieldLabel = computed(() => displayFieldOptions.value.find((o) => o.value === displayField.value)?.label ?? 'Placa')
 
 const statusSeverity: Record<string, string> = {
   Pago: 'success',
@@ -147,6 +170,16 @@ function labelById(list: Array<CatalogOption | ContactOption>, id: string | null
   return match ? ('label' in match ? match.label : match.name) : ''
 }
 
+function customColumnValue(entry: EntryRecord): string {
+  if (displayField.value === PLACA_FIELD) return entry.placa || '-'
+  const snapshot = Array.isArray(entry.customSnapshot) ? (entry.customSnapshot as CustomSnapshotItem[]) : []
+  const item = snapshot.find((s) => s.fieldKey === displayField.value)
+  if (!item || item.value == null || item.value === '') return '-'
+  if (item._type === 'CURRENCY') return brl(Number(item.value))
+  if (item._type === 'DATE') return formatDate(item.value as string)
+  return String(item.value)
+}
+
 function customSnapshotToRecord(snapshot: unknown): Record<string, unknown> {
   if (!Array.isArray(snapshot)) return {}
   const record: Record<string, unknown> = {}
@@ -184,13 +217,14 @@ async function loadEntries() {
   error.value = null
 
   try {
-    const [currentPeriod, serviceRes, categoryRes, statusRes, paymentRes, clientRes] = await Promise.all([
+    const [currentPeriod, serviceRes, categoryRes, statusRes, paymentRes, clientRes, customFieldRes] = await Promise.all([
       ensure(company.activeId),
       api<{ items: CatalogOption[] }>('/api/catalogs', { query: { companyId: company.activeId, kind: 'SERVICE' } }),
       api<{ items: CatalogOption[] }>('/api/catalogs', { query: { companyId: company.activeId, kind: 'CATEGORY' } }),
       api<{ items: CatalogOption[] }>('/api/catalogs', { query: { companyId: company.activeId, kind: 'STATUS' } }),
       api<{ items: CatalogOption[] }>('/api/catalogs', { query: { companyId: company.activeId, kind: 'PAYMENT_METHOD' } }),
       api<{ items: ContactOption[] }>('/api/contacts', { query: { companyId: company.activeId, type: 'CLIENT' } }),
+      api<{ items: CustomFieldOption[] }>('/api/custom-fields', { query: { companyId: company.activeId, kind: 'ENTRY' } }),
     ])
 
     services.value = serviceRes.items
@@ -198,6 +232,7 @@ async function loadEntries() {
     statuses.value = statusRes.items
     payments.value = paymentRes.items
     clients.value = clientRes.items
+    customFieldDefs.value = customFieldRes.items.filter((f) => f.active !== false)
 
     const response = await api<{ items: EntryRecord[] }>('/api/entries', {
       query: { companyId: company.activeId, periodId: currentPeriod.id },
@@ -395,9 +430,18 @@ onMounted(() => {
             <InputText v-model="search" placeholder="Buscar cliente, serviço..." size="small" fluid />
           </IconField>
           <Select v-model="statusFilter" :options="statusOptions" placeholder="Status" show-clear size="small" class="w-full md:w-40" />
+          <Select
+            v-model="displayField"
+            :options="displayFieldOptions"
+            option-label="label"
+            option-value="value"
+            placeholder="Campo personalizado"
+            size="small"
+            class="w-full md:w-52"
+          />
         </div>
 
-        <UiTableSkeleton v-if="loading" :rows="6" :columns="7" />
+        <UiTableSkeleton v-if="loading" :rows="6" :columns="8" />
 
         <DataTable
           v-else
@@ -425,6 +469,11 @@ onMounted(() => {
           <Column field="deslocamento" header="Desloc." sortable style="width:8rem">
             <template #body="{ data }">
               <span class="tabular-nums text-surface-500">{{ brl(data.deslocamento) }}</span>
+            </template>
+          </Column>
+          <Column :header="displayFieldLabel" style="width:9rem">
+            <template #body="{ data }">
+              <span class="text-sm text-surface-600 dark:text-surface-300">{{ customColumnValue(data.raw) }}</span>
             </template>
           </Column>
           <Column field="status" header="Status" sortable style="width:9rem">

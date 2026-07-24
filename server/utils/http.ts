@@ -1,7 +1,7 @@
 // ============================================================================
 // CPEK — helpers de handler (auth, validação zod, erros padronizados).
 // ARCHITECTURE §8: erros no formato { error: { code, message } }; toda rota
-// autenticada → withTenant → validação zod. Período fechado → 409 PERIOD_CLOSED.
+// autenticada → withTenant → validação zod.
 // ============================================================================
 import type { H3Event } from 'h3'
 import { z, type ZodTypeAny } from 'zod'
@@ -14,7 +14,7 @@ export function requireAuth(event: H3Event): AuthContext {
   return auth
 }
 
-/** Garante papel admin (ARCHITECTURE §8: criar empresa, fechar período, membros). */
+/** Garante papel admin (ARCHITECTURE §8: criar empresa, membros). */
 export function requireAdmin(event: H3Event): AuthContext {
   const auth = requireAuth(event)
   if (auth.role !== 'ADMIN') {
@@ -28,9 +28,9 @@ export function apiError(statusCode: number, code: string, message: string) {
   return createError({ statusCode, statusMessage: message, data: { error: { code, message } } })
 }
 
-/** Período fechado trava edição → 409 PERIOD_CLOSED (§8 / regra crítica 4). */
-export function periodClosedError() {
-  return apiError(409, 'PERIOD_CLOSED', 'Período fechado: edição bloqueada')
+/** Data futura não pode ser lançada — período é sempre automático (mês corrente ou retroativo). */
+export function futureDateError() {
+  return apiError(422, 'FUTURE_DATE', 'Não é possível lançar com uma data futura')
 }
 
 /** Valida o corpo da request com um schema zod (§6 regra 6: validação no servidor). */

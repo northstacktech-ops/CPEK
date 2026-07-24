@@ -13,6 +13,19 @@ interface NamedOption {
   name?: string
 }
 
+interface CustomFieldOption {
+  fieldKey: string
+  label: string
+  active?: boolean
+}
+
+interface CustomSnapshotItem {
+  fieldKey: string
+  value: unknown
+  _label: string
+  _type: string
+}
+
 interface ClosingRecord {
   id: string
   cliente?: string
@@ -59,6 +72,8 @@ const closings = ref<ClosingRow[]>([])
 const clients = ref<NamedOption[]>([])
 const categories = ref<NamedOption[]>([])
 const statuses = ref<NamedOption[]>([])
+const customFieldDefs = ref<CustomFieldOption[]>([])
+const displayField = ref<string | null>(null)
 
 const form = ref({
   cliente: null as string | null,
@@ -78,6 +93,9 @@ const statusOptions = computed(() => unique([...statuses.value.map(labelOf), ...
 const clienteOptions = computed(() => clients.value.map(labelOf))
 const categoriaOptions = computed(() => categories.value.map(labelOf))
 const statusSeverity: Record<string, string> = { Recebido: 'success', Pago: 'success', 'Em Aberto': 'info', Vencido: 'danger', Cancelado: 'secondary' }
+
+const displayFieldOptions = computed(() => customFieldDefs.value.map((f) => ({ value: f.fieldKey, label: f.label })))
+const displayFieldLabel = computed(() => displayFieldOptions.value.find((o) => o.value === displayField.value)?.label ?? 'Campo personalizado')
 
 const filtered = computed(() => {
   let result = closings.value
@@ -104,6 +122,15 @@ function labelById(list: NamedOption[], id: string | null | undefined) {
   if (!id) return ''
   const match = list.find((item) => item.id === id)
   return match ? labelOf(match) : ''
+}
+
+function customColumnValue(closing: ClosingRecord): string {
+  const snapshot = Array.isArray(closing.customSnapshot) ? (closing.customSnapshot as CustomSnapshotItem[]) : []
+  const item = snapshot.find((s) => s.fieldKey === displayField.value)
+  if (!item || item.value == null || item.value === '') return '-'
+  if (item._type === 'CURRENCY') return brl(Number(item.value))
+  if (item._type === 'DATE') return formatDate(item.value as string)
+  return String(item.value)
 }
 
 function customSnapshotToRecord(snapshot: unknown): Record<string, unknown> {
@@ -151,16 +178,19 @@ async function loadClosings() {
   error.value = null
 
   try {
-    const [currentPeriod, clientRes, categoryRes, statusRes] = await Promise.all([
+    const [currentPeriod, clientRes, categoryRes, statusRes, customFieldRes] = await Promise.all([
       ensure(company.activeId),
       api<{ items: NamedOption[] }>('/api/contacts', { query: { companyId: company.activeId, type: 'CLIENT' } }),
       api<{ items: NamedOption[] }>('/api/catalogs', { query: { companyId: company.activeId, kind: 'CATEGORY' } }),
       api<{ items: NamedOption[] }>('/api/catalogs', { query: { companyId: company.activeId, kind: 'STATUS' } }),
+      api<{ items: CustomFieldOption[] }>('/api/custom-fields', { query: { companyId: company.activeId, kind: 'CLOSING' } }),
     ])
 
     clients.value = clientRes.items
     categories.value = categoryRes.items
     statuses.value = statusRes.items
+    customFieldDefs.value = customFieldRes.items.filter((f) => f.active !== false)
+    if (!displayField.value && customFieldDefs.value.length) displayField.value = customFieldDefs.value[0].fieldKey
 
     const response = await api<{ items: ClosingRecord[] }>('/api/closings', {
       query: { companyId: company.activeId, periodId: currentPeriod.id },
@@ -332,9 +362,18 @@ onMounted(() => {
             <InputText v-model="search" placeholder="Buscar cliente..." size="small" fluid />
           </IconField>
           <Select v-model="statusFilter" :options="statusOptions" placeholder="Status" show-clear size="small" class="w-full md:w-40" />
+          <Select
+            v-model="displayField"
+            :options="displayFieldOptions"
+            option-label="label"
+            option-value="value"
+            placeholder="Campo personalizado"
+            size="small"
+            class="w-full md:w-52"
+          />
         </div>
 
-        <UiTableSkeleton v-if="loading" :rows="6" :columns="6" />
+        <UiTableSkeleton v-if="loading" :rows="6" :columns="7" />
 
         <DataTable v-else :value="filtered" data-key="id" paginator :rows="8" size="small" class="cpek-table">
           <Column field="cliente" header="Cliente" sortable />
@@ -347,6 +386,11 @@ onMounted(() => {
               <span :class="data.recebimento ? 'text-surface-700 dark:text-surface-200' : 'text-surface-400'">
                 {{ data.recebimento || '-' }}
               </span>
+            </template>
+          </Column>
+          <Column v-if="displayField" :header="displayFieldLabel" style="width:9rem">
+            <template #body="{ data }">
+              <span class="text-sm text-surface-600 dark:text-surface-300">{{ customColumnValue(data.raw) }}</span>
             </template>
           </Column>
           <Column field="status" header="Status" sortable style="width:9rem">

@@ -9,5 +9,3 @@ export const createPeriodBody = z.object({
   month: z.number().int().min(1).max(12),
   year: z.number().int().min(2000).max(2100),
 })
-
-export const closePeriodBody = z.object({ confirm: z.literal(true) })

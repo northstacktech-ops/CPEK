@@ -77,18 +77,6 @@ function isActive(itemRoute: string) {
       <ul class="space-y-0.5">
         <li>
           <NuxtLink
-            to="/periodos"
-            class="flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium transition-colors"
-            :class="isActive('/periodos')
-              ? 'bg-brand-50 text-brand-600 dark:bg-brand-600/15 dark:text-brand-300'
-              : 'text-surface-600 hover:bg-surface-100 hover:text-surface-900 dark:text-surface-400 dark:hover:bg-surface-800 dark:hover:text-surface-100'"
-          >
-            <i class="pi pi-calendar text-base text-surface-400 dark:text-surface-500" />
-            Períodos
-          </NuxtLink>
-        </li>
-        <li>
-          <NuxtLink
             to="/configuracoes"
             class="flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium transition-colors"
             :class="isActive('/configuracoes')

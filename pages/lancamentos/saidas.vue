@@ -14,6 +14,19 @@ interface NamedOption {
   costType?: string
 }
 
+interface CustomFieldOption {
+  fieldKey: string
+  label: string
+  active?: boolean
+}
+
+interface CustomSnapshotItem {
+  fieldKey: string
+  value: unknown
+  _label: string
+  _type: string
+}
+
 interface ExitRecord {
   id: string
   data?: string
@@ -68,6 +81,8 @@ const categories = ref<NamedOption[]>([])
 const suppliers = ref<NamedOption[]>([])
 const costCenters = ref<NamedOption[]>([])
 const payments = ref<NamedOption[]>([])
+const customFieldDefs = ref<CustomFieldOption[]>([])
+const displayField = ref<string | null>(null)
 
 const form = ref({
   valor: null as number | null,
@@ -93,6 +108,9 @@ const centroCustoOptions = computed(() => costCenters.value.map(labelOf))
 const pagamentoOptions = computed(() => payments.value.map(labelOf))
 const statusSeverity: Record<string, string> = { Pago: 'success', 'Em Aberto': 'info', Vencido: 'danger', Cancelado: 'secondary' }
 
+const displayFieldOptions = computed(() => customFieldDefs.value.map((f) => ({ value: f.fieldKey, label: f.label })))
+const displayFieldLabel = computed(() => displayFieldOptions.value.find((o) => o.value === displayField.value)?.label ?? 'Campo personalizado')
+
 const filtered = computed(() => {
   let result = exits.value
   if (statusFilter.value) result = result.filter((exit) => exit.status === statusFilter.value)
@@ -114,6 +132,15 @@ function optionIdByLabel(list: NamedOption[], label: string | null) {
 function labelById(list: NamedOption[], id: string | null | undefined) {
   if (!id) return ''
   return labelOf(list.find((item) => item.id === id) ?? { id: '' })
+}
+
+function customColumnValue(exit: ExitRecord): string {
+  const snapshot = Array.isArray(exit.customSnapshot) ? (exit.customSnapshot as CustomSnapshotItem[]) : []
+  const item = snapshot.find((s) => s.fieldKey === displayField.value)
+  if (!item || item.value == null || item.value === '') return '-'
+  if (item._type === 'CURRENCY') return brl(Number(item.value))
+  if (item._type === 'DATE') return formatDate(item.value as string)
+  return String(item.value)
 }
 
 function customSnapshotToRecord(snapshot: unknown): Record<string, unknown> {
@@ -163,18 +190,21 @@ async function loadExits() {
   error.value = null
 
   try {
-    const [currentPeriod, categoryRes, supplierRes, costCenterRes, paymentRes] = await Promise.all([
+    const [currentPeriod, categoryRes, supplierRes, costCenterRes, paymentRes, customFieldRes] = await Promise.all([
       ensure(company.activeId),
       api<{ items: NamedOption[] }>('/api/catalogs', { query: { companyId: company.activeId, kind: 'CATEGORY' } }),
       api<{ items: NamedOption[] }>('/api/contacts', { query: { companyId: company.activeId, type: 'SUPPLIER' } }),
       api<{ items: NamedOption[] }>('/api/cost-centers', { query: { companyId: company.activeId } }),
       api<{ items: NamedOption[] }>('/api/catalogs', { query: { companyId: company.activeId, kind: 'PAYMENT_METHOD' } }),
+      api<{ items: CustomFieldOption[] }>('/api/custom-fields', { query: { companyId: company.activeId, kind: 'EXIT' } }),
     ])
 
     categories.value = categoryRes.items
     suppliers.value = supplierRes.items
     costCenters.value = costCenterRes.items
     payments.value = paymentRes.items
+    customFieldDefs.value = customFieldRes.items.filter((f) => f.active !== false)
+    if (!displayField.value && customFieldDefs.value.length) displayField.value = customFieldDefs.value[0].fieldKey
 
     const response = await api<{ items: ExitRecord[] }>('/api/exits', {
       query: { companyId: company.activeId, periodId: currentPeriod.id },
@@ -359,9 +389,18 @@ onMounted(() => {
           </IconField>
           <Select v-model="centroCustoFilter" :options="centroCustoOptions" placeholder="C. Custo" show-clear size="small" class="w-full md:w-40" />
           <Select v-model="statusFilter" :options="statusOptions" placeholder="Status" show-clear size="small" class="w-full md:w-40" />
+          <Select
+            v-model="displayField"
+            :options="displayFieldOptions"
+            option-label="label"
+            option-value="value"
+            placeholder="Campo personalizado"
+            size="small"
+            class="w-full md:w-52"
+          />
         </div>
 
-        <UiTableSkeleton v-if="loading" :rows="6" :columns="7" />
+        <UiTableSkeleton v-if="loading" :rows="6" :columns="8" />
 
         <DataTable v-else :value="filtered" data-key="id" paginator :rows="8" size="small" class="cpek-table">
           <Column field="data" header="Data" sortable style="width:9rem" />
@@ -376,6 +415,11 @@ onMounted(() => {
             <template #body="{ data }"><span class="font-semibold tabular-nums text-red-600">{{ brl(data.valor) }}</span></template>
           </Column>
           <Column field="vencimento" header="Vencimento" sortable style="width:9rem" />
+          <Column v-if="displayField" :header="displayFieldLabel" style="width:9rem">
+            <template #body="{ data }">
+              <span class="text-sm text-surface-600 dark:text-surface-300">{{ customColumnValue(data.raw) }}</span>
+            </template>
+          </Column>
           <Column field="status" header="Status" sortable style="width:9rem">
             <template #body="{ data }"><Tag :value="data.status" :severity="statusSeverity[data.status] ?? 'secondary'" /></template>
           </Column>

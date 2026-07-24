@@ -6,10 +6,8 @@ export const usePeriodStore = defineStore('period', {
     month: new Date().getMonth() + 1,
     year: new Date().getFullYear(),
     periodId: null as string | null,
-    status: 'OPEN' as 'OPEN' | 'CLOSED',
   }),
   getters: {
-    isClosed: (s) => s.status === 'CLOSED',
     label: (s) => `${String(s.month).padStart(2, '0')}/${s.year}`,
   },
   actions: {
@@ -19,7 +17,6 @@ export const usePeriodStore = defineStore('period', {
     },
     reset() {
       this.periodId = null
-      this.status = 'OPEN'
     },
   },
 })

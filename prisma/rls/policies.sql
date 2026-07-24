@@ -51,7 +51,7 @@ declare
   t text;
   tenant_tables text[] := array[
     'account', 'app_user', 'form_permission', 'company',
-    'catalog_value', 'cost_center', 'fee_profile', 'bank_account',
+    'catalog_value', 'cost_center', 'fee_profile',
     'contact', 'custom_field', 'period',
     'entry', 'exit', 'closing', 'audit_log'
   ];

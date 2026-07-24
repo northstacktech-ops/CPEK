@@ -27,7 +27,6 @@ export async function seedTenant(tenantId: string) {
     })
     const companyId = company.id
 
-    await tx.bankAccount.create({ data: { tenantId, companyId, name: 'Caixa' } })
     await tx.catalogValue.create({
       data: { tenantId, companyId, kind: 'SERVICE', label: 'Cautelar' },
     })

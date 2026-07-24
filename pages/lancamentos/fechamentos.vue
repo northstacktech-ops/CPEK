@@ -11,7 +11,6 @@ interface NamedOption {
   id: string
   label?: string
   name?: string
-  bankAccountId?: string
 }
 
 interface ClosingRecord {
@@ -27,7 +26,6 @@ interface ClosingRecord {
   dataFechamento?: string | null
   dataVencPrev?: string | null
   dataRecebimento?: string | null
-  bankAccountId?: string | null
   contactId?: string | null
   categoryId?: string | null
   statusId?: string | null
@@ -59,13 +57,11 @@ const editingId = ref<string | null>(null)
 
 const closings = ref<ClosingRow[]>([])
 const clients = ref<NamedOption[]>([])
-const accounts = ref<NamedOption[]>([])
 const categories = ref<NamedOption[]>([])
 const statuses = ref<NamedOption[]>([])
 
 const form = ref({
   cliente: null as string | null,
-  conta: null as string | null,
   categoria: null as string | null,
   descricao: '',
   documentoNf: '',
@@ -80,7 +76,6 @@ const form = ref({
 const fallbackStatusOptions = ['Em Aberto', 'Recebido', 'Vencido', 'Cancelado']
 const statusOptions = computed(() => unique([...statuses.value.map(labelOf), ...fallbackStatusOptions]))
 const clienteOptions = computed(() => clients.value.map(labelOf))
-const contaOptions = computed(() => accounts.value.map(labelOf))
 const categoriaOptions = computed(() => categories.value.map(labelOf))
 const statusSeverity: Record<string, string> = { Recebido: 'success', Pago: 'success', 'Em Aberto': 'info', Vencido: 'danger', Cancelado: 'secondary' }
 
@@ -102,14 +97,12 @@ function labelOf(item: NamedOption) {
 
 function optionIdByLabel(list: NamedOption[], label: string | null) {
   if (!label) return undefined
-  const match = list.find((item) => labelOf(item) === label)
-  if (!match) return undefined
-  return match.bankAccountId ?? match.id
+  return list.find((item) => labelOf(item) === label)?.id
 }
 
 function labelById(list: NamedOption[], id: string | null | undefined) {
   if (!id) return ''
-  const match = list.find((item) => item.id === id || item.bankAccountId === id)
+  const match = list.find((item) => item.id === id)
   return match ? labelOf(match) : ''
 }
 
@@ -158,16 +151,14 @@ async function loadClosings() {
   error.value = null
 
   try {
-    const [currentPeriod, clientRes, accountRes, categoryRes, statusRes] = await Promise.all([
+    const [currentPeriod, clientRes, categoryRes, statusRes] = await Promise.all([
       ensure(company.activeId),
       api<{ items: NamedOption[] }>('/api/contacts', { query: { companyId: company.activeId, type: 'CLIENT' } }),
-      api<{ items: NamedOption[] }>('/api/bank-accounts', { query: { companyId: company.activeId } }),
       api<{ items: NamedOption[] }>('/api/catalogs', { query: { companyId: company.activeId, kind: 'CATEGORY' } }),
       api<{ items: NamedOption[] }>('/api/catalogs', { query: { companyId: company.activeId, kind: 'STATUS' } }),
     ])
 
     clients.value = clientRes.items
-    accounts.value = accountRes.items
     categories.value = categoryRes.items
     statuses.value = statusRes.items
 
@@ -185,7 +176,6 @@ async function loadClosings() {
 function resetForm() {
   form.value = {
     cliente: null,
-    conta: null,
     categoria: null,
     descricao: '',
     documentoNf: '',
@@ -208,7 +198,6 @@ function openEdit(row: ClosingRow) {
   editingId.value = row.id
   form.value = {
     cliente: row.cliente === 'Sem cliente' ? null : row.cliente,
-    conta: labelById(accounts.value, row.raw.bankAccountId) || null,
     categoria: labelById(categories.value, row.raw.categoryId) || null,
     descricao: row.raw.descricao ?? '',
     documentoNf: row.raw.documentoNf ?? '',
@@ -237,7 +226,6 @@ async function save() {
       ? (form.value.recebimento ?? new Date())
       : form.value.recebimento ?? undefined
     const body = {
-      bankAccountId: optionIdByLabel(accounts.value, form.value.conta),
       contactId: optionIdByLabel(clients.value, form.value.cliente),
       categoryId: optionIdByLabel(categories.value, form.value.categoria),
       statusId: optionIdByLabel(statuses.value, form.value.status),
@@ -389,10 +377,6 @@ onMounted(() => {
         <div class="flex flex-col gap-1.5">
           <label class="text-xs font-semibold uppercase tracking-wide text-surface-500">Cliente</label>
           <Select v-model="form.cliente" :options="clienteOptions" placeholder="Selecione o cliente" filter fluid />
-        </div>
-        <div class="flex flex-col gap-1.5">
-          <label class="text-xs font-semibold uppercase tracking-wide text-surface-500">Conta bancária</label>
-          <Select v-model="form.conta" :options="contaOptions" placeholder="Selecione a conta" filter fluid />
         </div>
         <div class="flex flex-col gap-1.5">
           <label class="text-xs font-semibold uppercase tracking-wide text-surface-500">Categoria</label>

@@ -342,6 +342,14 @@ watch(
       <template #actions>
         <Button
           v-if="hasCompanies && !editing"
+          label="Nova empresa"
+          icon="pi pi-plus"
+          severity="secondary"
+          outlined
+          @click="openCreateCompany"
+        />
+        <Button
+          v-if="hasCompanies && !editing"
           label="Editar"
           icon="pi pi-pencil"
           :disabled="loading || !activeCompany"

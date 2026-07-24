@@ -13,7 +13,6 @@ const periodStore = usePeriodStore()
 const { load } = useDashboard()
 
 const period = ref(new Date(periodStore.year, periodStore.month - 1, 1))
-const accountSearch = ref('')
 const loading = ref(false)
 const error = ref<string | null>(null)
 const dashboard = ref<DashboardData | null>(null)
@@ -21,8 +20,6 @@ const reducedMotion = ref(false)
 
 const emptyDashboard = computed<DashboardData>(() => ({
   cards: { faturamentoBruto: 0, despesas: 0, lucroReal: 0, ticketMedio: 0, vencidos: 0, royalties: null, impostoNf: null },
-  accounts: [],
-  consolidatedBalance: 0,
   cashFlow: Array.from({ length: 12 }, (_, index) => ({
     date: `${periodStore.year}-${String(index + 1).padStart(2, '0')}-01`,
     realized: 0,
@@ -94,21 +91,6 @@ const fiscalKpis = computed(() => {
       severity: 'info',
     },
   ]
-})
-
-const accounts = computed(() =>
-  currentData.value.accounts.map((account) => ({
-    id: account.bankAccountId,
-    name: account.name,
-    type: 'Conta bancária',
-    balance: account.balance,
-  })),
-)
-
-const filteredAccounts = computed(() => {
-  const q = accountSearch.value.trim().toLowerCase()
-  if (!q) return accounts.value
-  return accounts.value.filter((account) => `${account.name} ${account.type}`.toLowerCase().includes(q))
 })
 
 const chartData = computed(() => ({
@@ -277,54 +259,7 @@ const brl = (value: number) => value.toLocaleString('pt-BR', { style: 'currency'
         </div>
       </div>
 
-      <Card class="col-span-12 border border-surface-200 dark:border-surface-800 xl:col-span-5">
-        <template #title>
-          <span>Contas bancárias</span>
-        </template>
-        <template #content>
-          <IconField class="mb-3 w-full">
-            <InputIcon class="pi pi-search" />
-            <InputText v-model="accountSearch" placeholder="Buscar conta" size="small" fluid />
-          </IconField>
-          <UiTableSkeleton v-if="loading" :rows="5" :columns="2" />
-
-          <DataTable
-            v-else
-            :value="filteredAccounts"
-            data-key="id"
-            :rows="5"
-            size="small"
-            sort-field="balance"
-            :sort-order="-1"
-          >
-            <Column field="name" header="Conta" sortable>
-              <template #body="{ data }">
-                <div>
-                  <p class="text-sm font-semibold text-surface-900 dark:text-surface-0">{{ data.name }}</p>
-                  <p class="text-xs text-surface-400">{{ data.type }}</p>
-                </div>
-              </template>
-            </Column>
-            <Column field="balance" header="Saldo" sortable class="text-right">
-              <template #body="{ data }">
-                <span class="font-semibold tabular-nums">{{ brl(data.balance) }}</span>
-              </template>
-            </Column>
-            <template #empty>
-              <div class="py-8 text-center text-sm text-surface-400">
-                Nenhuma conta encontrada. Cadastre uma conta para acompanhar o saldo.
-              </div>
-            </template>
-          </DataTable>
-          <Divider class="!my-3" />
-          <div class="flex items-center justify-between rounded-lg bg-brand-50 px-3 py-2.5 dark:bg-brand-600/15">
-            <span class="text-sm font-semibold text-brand-700 dark:text-brand-200">Saldo Consolidado</span>
-            <strong class="text-base tabular-nums text-brand-700 dark:text-brand-200">{{ brl(currentData.consolidatedBalance) }}</strong>
-          </div>
-        </template>
-      </Card>
-
-      <Card class="col-span-12 border border-surface-200 dark:border-surface-800 xl:col-span-7">
+      <Card class="col-span-12 border border-surface-200 dark:border-surface-800">
         <template #title>Fluxo de Caixa Acumulado</template>
         <template #subtitle>Realizado até o período selecionado · Previsto para o ano</template>
         <template #content>

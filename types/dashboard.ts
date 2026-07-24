@@ -11,12 +11,6 @@ export interface DashboardCards {
   impostoNf: number | null
 }
 
-export interface BankAccountBalance {
-  bankAccountId: string
-  name: string
-  balance: number
-}
-
 export interface CashFlowPoint {
   date: string
   realized: number
@@ -25,7 +19,5 @@ export interface CashFlowPoint {
 
 export interface DashboardData {
   cards: DashboardCards
-  accounts: BankAccountBalance[]
-  consolidatedBalance: number
   cashFlow: CashFlowPoint[]
 }

@@ -30,7 +30,6 @@ const TENANT_COLUMN_MODELS = new Set<string>([
   'CatalogValue',
   'CostCenter',
   'FeeProfile',
-  'BankAccount',
   'Contact',
   'CustomField',
   'Period',

@@ -180,7 +180,6 @@ Schema completo e comentado: **`prisma/schema.prisma`**. Entidades:
 | `User` | Usuário (`id` = `auth.users.id`), papel admin/member · **1:1 com Account no MVP** (N:N na V2, §17) |
 | `FormPermission` | Gancho de ACL por formulário (D6, não usado no MVP) |
 | `Company` | Empresa/unidade dentro da conta |
-| `BankAccount` | Conta bancária ("Contas") + saldo de abertura |
 | `CatalogValue` | Lookup: `PAYMENT_METHOD`, `SERVICE`, `STATUS`, `CATEGORY` (+`dreGroup`) |
 | `CostCenter` | Centro de custo (Fixo/Variável) |
 | `FeeProfile` | Taxas e Juros (perfil reutilizável) |
@@ -245,7 +244,7 @@ Receita Operacional            Σ dreGroup=OPERATING_REVENUE  (quebra por servic
 ```
 
 - Eixo temporal: JAN…DEZ + total do ano. Quebra por serviço dentro de Receita Operacional.
-- Fechamentos entram pela `categoryId`→`dreGroup`. Filtro por `bankAccountId`. Linhas expansíveis (resumo ↔ detalhe).
+- Fechamentos entram pela `categoryId`→`dreGroup`. Linhas expansíveis (resumo ↔ detalhe).
 
 ### 7.2 Realizado × Agendado
 
@@ -268,8 +267,7 @@ Convenções: todas autenticadas; `companyId` validado contra o tenant; toda mut
 | `GET` | `/api/me` | Sessão, papel, empresas acessíveis |
 | `GET` | `/api/companies` | Empresas do tenant |
 | `POST` | `/api/companies` | Criar empresa (admin) → aplica template de seed |
-| `GET` | `/api/dashboard?companyId&from&to` | 5 cards + contas + fluxo acumulado |
-| `GET` | `/api/bank-accounts?companyId` | Contas + saldo consolidado |
+| `GET` | `/api/dashboard?companyId&from&to` | 5 cards + fluxo acumulado |
 | `GET` | `/api/entries?companyId&periodId&page` | Listar entradas |
 | `POST` | `/api/entries` | Criar entrada (valida fixos+custom, grava snapshot) |
 | `PATCH` | `/api/entries/:id` | Editar (409 se período fechado) |
@@ -406,7 +404,7 @@ O vazamento mais perigoso costuma estar numa **entidade ou endpoint específico*
 ```ts
 // tests/rls-isolation.spec.ts
 const TENANT_MODELS = [
-  'company','bankAccount','catalogValue','costCenter','feeProfile',
+  'company','catalogValue','costCenter','feeProfile',
   'contact','customField','period','entry','exit','closing','auditLog',
 ] as const
 

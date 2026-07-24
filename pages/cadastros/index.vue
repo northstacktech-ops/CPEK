@@ -17,7 +17,6 @@ const sections = reactive([
   { key: 'formas-pagamento', label: 'Formas de Pgto.', icon: 'pi pi-credit-card', desc: 'Dinheiro, PIX, Cartão, Boleto', count: 0, route: '/cadastros/formas-pagamento' },
   { key: 'centros-custo', label: 'Centros de Custo', icon: 'pi pi-objects-column', desc: 'Fixo e Variável', count: 0, route: '/cadastros/centros-custo' },
   { key: 'taxas', label: 'Taxas e Juros', icon: 'pi pi-percentage', desc: 'Perfis reutilizáveis de taxas', count: 0, route: '/cadastros/taxas' },
-  { key: 'contas', label: 'Contas Bancárias', icon: 'pi pi-building-columns', desc: 'Boleto, Caixa, Cartão, Cortesia', count: 0, route: '/cadastros/contas' },
   { key: 'campos-custom', label: 'Campos Personalizados', icon: 'pi pi-sliders-h', desc: 'Placa, Modelo, RENAVAM e outros', count: 0, route: '/cadastros/campos-custom' },
 ])
 
@@ -32,10 +31,9 @@ async function loadCounts() {
     api<{ items: unknown[] }>('/api/catalogs', { query: { companyId, kind: 'PAYMENT_METHOD' } }),
     api<{ items: unknown[] }>('/api/cost-centers', { query: { companyId } }),
     api<{ items: unknown[] }>('/api/fee-profiles', { query: { companyId } }),
-    api<{ items: unknown[] }>('/api/bank-accounts', { query: { companyId } }),
     api<{ items: unknown[] }>('/api/custom-fields', { query: { companyId } }),
   ])
-  const [categorias, servicos, status, formas, centros, taxas, contas, campos] = results
+  const [categorias, servicos, status, formas, centros, taxas, campos] = results
   const count = (r: PromiseSettledResult<{ items: unknown[] }>) => (r.status === 'fulfilled' ? r.value.items.length : 0)
   sections[0].count = count(categorias)
   sections[1].count = count(servicos)
@@ -43,8 +41,7 @@ async function loadCounts() {
   sections[3].count = count(formas)
   sections[4].count = count(centros)
   sections[5].count = count(taxas)
-  sections[6].count = count(contas)
-  sections[7].count = count(campos)
+  sections[6].count = count(campos)
 
   const failed = results.find((r): r is PromiseRejectedResult => r.status === 'rejected')
   if (failed) error.value = apiErrorMessage(failed.reason, 'Não foi possível carregar todos os contadores de cadastros.')
@@ -58,7 +55,7 @@ watch(() => company.activeId, loadCounts)
   <div>
     <PageHeader
       title="Cadastros"
-      description="Gerencie os catálogos, centros de custo, contas bancárias e campos personalizados."
+      description="Gerencie os catálogos, centros de custo e campos personalizados."
     >
       <template #breadcrumb>
         <AppBreadcrumb :items="[{ label: 'Cadastros' }]" />

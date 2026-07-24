@@ -11,7 +11,6 @@ export const listExitsQuery = z.object({
 export const createExitBody = z.object({
   companyId: uuid,
   periodId: uuid.optional(), // derivado automaticamente de dataLancamento (server/utils/period.ts)
-  bankAccountId: uuid.optional(),
   contactId: uuid.optional(),
   costCenterId: uuid.optional(),
   categoryId: uuid.optional(),

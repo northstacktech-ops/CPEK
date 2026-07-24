@@ -19,12 +19,6 @@ interface ContactOption {
   active?: boolean
 }
 
-interface AccountOption {
-  id?: string
-  bankAccountId?: string
-  name: string
-}
-
 interface EntryRecord {
   id: string
   data?: string
@@ -41,7 +35,6 @@ interface EntryRecord {
   modelo?: string | null
   dataServico?: string | null
   dataPagamento?: string | null
-  bankAccountId?: string | null
   contactId?: string | null
   serviceId?: string | null
   categoryId?: string | null
@@ -81,7 +74,6 @@ const services = ref<CatalogOption[]>([])
 const categories = ref<CatalogOption[]>([])
 const statuses = ref<CatalogOption[]>([])
 const payments = ref<CatalogOption[]>([])
-const accounts = ref<AccountOption[]>([])
 const clients = ref<ContactOption[]>([])
 const entries = ref<EntryRow[]>([])
 
@@ -91,7 +83,6 @@ const form = ref({
   dataRecebimento: null as Date | null,
   descricao: '',
   categoria: null as string | null,
-  conta: null as string | null,
   dataCompetencia: new Date() as Date | null,
   cliente: null as string | null,
   taxa: null as string | null,
@@ -113,7 +104,6 @@ const statusOptions = computed(() => unique([...statuses.value.map((item) => ite
 const servicoOptions = computed(() => services.value.map((item) => item.label))
 const categoriaOptions = computed(() => categories.value.map((item) => item.label))
 const pagamentoOptions = computed(() => payments.value.map((item) => item.label))
-const contaOptions = computed(() => accounts.value.map((item) => item.name))
 const clienteOptions = computed(() => clients.value.map((item) => item.name))
 
 const statusSeverity: Record<string, string> = {
@@ -145,16 +135,15 @@ function formatDate(value: Date | string | null | undefined) {
   return new Date(value).toLocaleDateString('pt-BR')
 }
 
-function optionIdByLabel(list: Array<CatalogOption | ContactOption | AccountOption>, label: string | null) {
+function optionIdByLabel(list: Array<CatalogOption | ContactOption>, label: string | null) {
   if (!label) return undefined
   const match = list.find((item) => ('label' in item ? item.label : item.name) === label)
-  if (!match) return undefined
-  return 'bankAccountId' in match ? (match.bankAccountId ?? match.id) : match.id
+  return match?.id
 }
 
-function labelById(list: Array<CatalogOption | ContactOption | AccountOption>, id: string | null | undefined) {
+function labelById(list: Array<CatalogOption | ContactOption>, id: string | null | undefined) {
   if (!id) return ''
-  const match = list.find((item) => ('bankAccountId' in item ? item.bankAccountId === id || item.id === id : item.id === id))
+  const match = list.find((item) => item.id === id)
   return match ? ('label' in match ? match.label : match.name) : ''
 }
 
@@ -195,13 +184,12 @@ async function loadEntries() {
   error.value = null
 
   try {
-    const [currentPeriod, serviceRes, categoryRes, statusRes, paymentRes, accountRes, clientRes] = await Promise.all([
+    const [currentPeriod, serviceRes, categoryRes, statusRes, paymentRes, clientRes] = await Promise.all([
       ensure(company.activeId),
       api<{ items: CatalogOption[] }>('/api/catalogs', { query: { companyId: company.activeId, kind: 'SERVICE' } }),
       api<{ items: CatalogOption[] }>('/api/catalogs', { query: { companyId: company.activeId, kind: 'CATEGORY' } }),
       api<{ items: CatalogOption[] }>('/api/catalogs', { query: { companyId: company.activeId, kind: 'STATUS' } }),
       api<{ items: CatalogOption[] }>('/api/catalogs', { query: { companyId: company.activeId, kind: 'PAYMENT_METHOD' } }),
-      api<{ items: AccountOption[] }>('/api/bank-accounts', { query: { companyId: company.activeId } }),
       api<{ items: ContactOption[] }>('/api/contacts', { query: { companyId: company.activeId, type: 'CLIENT' } }),
     ])
 
@@ -209,7 +197,6 @@ async function loadEntries() {
     categories.value = categoryRes.items
     statuses.value = statusRes.items
     payments.value = paymentRes.items
-    accounts.value = accountRes.items
     clients.value = clientRes.items
 
     const response = await api<{ items: EntryRecord[] }>('/api/entries', {
@@ -230,7 +217,6 @@ function resetForm() {
     dataRecebimento: null,
     descricao: '',
     categoria: null,
-    conta: null,
     dataCompetencia: new Date(),
     cliente: null,
     taxa: null,
@@ -262,7 +248,6 @@ function openEdit(row: EntryRow) {
     dataRecebimento: row.raw.dataPagamento ? new Date(row.raw.dataPagamento) : null,
     descricao: row.raw.anotacoes ?? '',
     categoria: labelById(categories.value, row.raw.categoryId) || null,
-    conta: labelById(accounts.value, row.raw.bankAccountId) || null,
     dataCompetencia: row.raw.dataServico ? new Date(row.raw.dataServico) : new Date(),
     cliente: row.cliente === 'Sem cliente' ? null : row.cliente,
     taxa: null,
@@ -296,7 +281,6 @@ async function saveEntry() {
       ? (form.value.dataRecebimento ?? new Date())
       : undefined
     const body = {
-      bankAccountId: optionIdByLabel(accounts.value, form.value.conta),
       contactId: optionIdByLabel(clients.value, form.value.cliente),
       serviceId: optionIdByLabel(services.value, form.value.servico),
       categoryId: optionIdByLabel(categories.value, form.value.categoria),
@@ -496,10 +480,6 @@ onMounted(() => {
         <div class="flex flex-col gap-1.5">
           <label class="text-xs font-semibold uppercase tracking-wide text-surface-500">Categoria</label>
           <Select v-model="form.categoria" :options="categoriaOptions" placeholder="Selecione a categoria" filter fluid />
-        </div>
-        <div class="flex flex-col gap-1.5">
-          <label class="text-xs font-semibold uppercase tracking-wide text-surface-500">Conta bancária</label>
-          <Select v-model="form.conta" :options="contaOptions" placeholder="Selecione a conta" filter fluid />
         </div>
         <div class="flex flex-col gap-1.5">
           <label class="text-xs font-semibold uppercase tracking-wide text-surface-500">Deslocamento</label>

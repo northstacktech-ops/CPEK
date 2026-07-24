@@ -16,7 +16,6 @@ const describeWithDatabase = process.env.DATABASE_URL ? describe : describe.skip
 
 const TENANT_MODELS = [
   'company',
-  'bankAccount',
   'catalogValue',
   'costCenter',
   'feeProfile',

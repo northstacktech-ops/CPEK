@@ -28,11 +28,8 @@ const company = useCompanyStore()
 const periodStore = usePeriodStore()
 const { api } = useApi()
 
-const drawerOpen = ref(false)
 const loading = ref(false)
-const saving = ref(false)
 const error = ref<string | null>(null)
-const form = ref({ competencia: new Date(periodStore.year, periodStore.month - 1, 1) as Date | null })
 
 const periodos = ref<PeriodRow[]>([])
 const activePeriodId = computed(() => periodStore.periodId)
@@ -82,42 +79,6 @@ async function loadPeriods() {
   }
 }
 
-async function save() {
-  if (saving.value) return
-  if (!company.activeId) {
-    error.value = 'Selecione ou crie uma empresa em Configurações antes de criar um período.'
-    return
-  }
-  if (!form.value.competencia) {
-    error.value = 'Selecione a competência do período.'
-    return
-  }
-  saving.value = true
-  error.value = null
-
-  try {
-    const selected = form.value.competencia
-    const response = await api<{ item: PeriodRecord }>('/api/periods', {
-      method: 'POST',
-      body: {
-        companyId: company.activeId,
-        month: selected.getMonth() + 1,
-        year: selected.getFullYear(),
-      },
-    })
-    const normalized = normalizePeriod(response.item)
-    periodos.value = [normalized, ...periodos.value.filter((item) => item.id !== normalized.id)]
-    periodStore.set(response.item.month, response.item.year)
-    periodStore.periodId = response.item.id
-    periodStore.status = response.item.status
-    drawerOpen.value = false
-  } catch (err) {
-    error.value = apiErrorMessage(err, 'Não foi possível criar o período.')
-  } finally {
-    saving.value = false
-  }
-}
-
 function setActive(row: PeriodRow) {
   periodStore.set(row.raw.month, row.raw.year)
   periodStore.periodId = row.id
@@ -160,12 +121,9 @@ onMounted(() => {
 
 <template>
   <div>
-    <PageHeader title="Períodos" description="Competências mensais fixas, sempre do primeiro ao último dia do mês.">
+    <PageHeader title="Períodos" description="Competências mensais criadas automaticamente a partir da data de cada lançamento.">
       <template #breadcrumb>
         <AppBreadcrumb :items="[{ label: 'Períodos' }]" />
-      </template>
-      <template #actions>
-        <Button icon="pi pi-plus" label="Novo período" size="small" @click="drawerOpen = true" />
       </template>
     </PageHeader>
 
@@ -220,30 +178,11 @@ onMounted(() => {
             <div class="flex flex-col items-center py-10 text-center">
               <i class="pi pi-calendar mb-3 text-3xl text-surface-300" />
               <p class="text-sm font-medium text-surface-500">Nenhum período cadastrado</p>
-              <p class="mt-1 text-xs text-surface-400">Crie a competência mensal antes de lançar movimentos.</p>
+              <p class="mt-1 text-xs text-surface-400">O período é criado automaticamente ao registrar o primeiro lançamento do mês.</p>
             </div>
           </template>
         </DataTable>
       </div>
     </PageContent>
-
-    <Dialog v-model:visible="drawerOpen" modal header="Novo período mensal" class="!w-[480px] !max-w-[96vw]" :draggable="false">
-      <form class="space-y-4" @submit.prevent="save">
-        <Message v-if="error" severity="error" size="small">{{ error }}</Message>
-        <div class="flex flex-col gap-1.5">
-          <label class="text-xs font-semibold uppercase tracking-wide text-surface-500">Competência</label>
-          <DatePicker v-model="form.competencia" view="month" date-format="MM yy" show-icon fluid />
-        </div>
-        <Message severity="info" size="small" variant="simple">
-          A competência sempre começa no dia 1 e termina no último dia do mês selecionado.
-        </Message>
-      </form>
-      <template #footer>
-        <div class="flex gap-2 pt-1">
-          <Button label="Cancelar" severity="secondary" outlined fluid @click="drawerOpen = false" />
-          <Button label="Criar período" :loading="saving" fluid @click="save" />
-        </div>
-      </template>
-    </Dialog>
   </div>
 </template>

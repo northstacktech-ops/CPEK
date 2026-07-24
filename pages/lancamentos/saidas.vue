@@ -30,7 +30,6 @@ interface ExitRecord {
   dataLancamento?: string | null
   dataVencimento?: string | null
   dataPagamento?: string | null
-  bankAccountId?: string | null
   contactId?: string | null
   categoryId?: string | null
   costCenterId?: string | null
@@ -67,7 +66,6 @@ const editingId = ref<string | null>(null)
 const exits = ref<ExitRow[]>([])
 const categories = ref<NamedOption[]>([])
 const suppliers = ref<NamedOption[]>([])
-const accounts = ref<NamedOption[]>([])
 const costCenters = ref<NamedOption[]>([])
 const payments = ref<NamedOption[]>([])
 
@@ -80,7 +78,6 @@ const form = ref({
   documentoNf: '',
   formaPagamento: null as string | null,
   categoria: null as string | null,
-  conta: null as string | null,
   dataCompetencia: new Date() as Date | null,
   dataVencimento: new Date() as Date | null,
   fornecedor: null as string | null,
@@ -92,7 +89,6 @@ const form = ref({
 const statusOptions = ['Em Aberto', 'Pago', 'Vencido', 'Cancelado']
 const categoriaOptions = computed(() => categories.value.map(labelOf))
 const fornecedorOptions = computed(() => suppliers.value.map(labelOf))
-const contaOptions = computed(() => accounts.value.map(labelOf))
 const centroCustoOptions = computed(() => costCenters.value.map(labelOf))
 const pagamentoOptions = computed(() => payments.value.map(labelOf))
 const statusSeverity: Record<string, string> = { Pago: 'success', 'Em Aberto': 'info', Vencido: 'danger', Cancelado: 'secondary' }
@@ -167,18 +163,16 @@ async function loadExits() {
   error.value = null
 
   try {
-    const [currentPeriod, categoryRes, supplierRes, accountRes, costCenterRes, paymentRes] = await Promise.all([
+    const [currentPeriod, categoryRes, supplierRes, costCenterRes, paymentRes] = await Promise.all([
       ensure(company.activeId),
       api<{ items: NamedOption[] }>('/api/catalogs', { query: { companyId: company.activeId, kind: 'CATEGORY' } }),
       api<{ items: NamedOption[] }>('/api/contacts', { query: { companyId: company.activeId, type: 'SUPPLIER' } }),
-      api<{ items: NamedOption[] }>('/api/bank-accounts', { query: { companyId: company.activeId } }),
       api<{ items: NamedOption[] }>('/api/cost-centers', { query: { companyId: company.activeId } }),
       api<{ items: NamedOption[] }>('/api/catalogs', { query: { companyId: company.activeId, kind: 'PAYMENT_METHOD' } }),
     ])
 
     categories.value = categoryRes.items
     suppliers.value = supplierRes.items
-    accounts.value = accountRes.items
     costCenters.value = costCenterRes.items
     payments.value = paymentRes.items
 
@@ -203,7 +197,6 @@ function resetForm() {
     documentoNf: '',
     formaPagamento: null,
     categoria: null,
-    conta: null,
     dataCompetencia: new Date(),
     dataVencimento: new Date(),
     fornecedor: null,
@@ -230,7 +223,6 @@ function openEdit(row: ExitRow) {
     documentoNf: row.raw.documentoNf ?? '',
     formaPagamento: labelById(payments.value, row.raw.paymentId) || null,
     categoria: row.categoria === 'Sem categoria' ? null : row.categoria,
-    conta: labelById(accounts.value, row.raw.bankAccountId) || null,
     dataCompetencia: row.raw.dataLancamento ? new Date(row.raw.dataLancamento) : new Date(),
     dataVencimento: row.raw.dataVencimento ? new Date(row.raw.dataVencimento) : new Date(),
     fornecedor: row.fornecedor === 'Sem fornecedor' ? null : row.fornecedor,
@@ -256,7 +248,6 @@ async function save() {
       ? (form.value.dataPagamento ?? new Date())
       : undefined
     const body = {
-      bankAccountId: optionIdByLabel(accounts.value, form.value.conta),
       contactId: optionIdByLabel(suppliers.value, form.value.fornecedor),
       costCenterId: optionIdByLabel(costCenters.value, form.value.centroCusto),
       categoryId: optionIdByLabel(categories.value, form.value.categoria),
@@ -429,10 +420,6 @@ onMounted(() => {
         <div class="flex flex-col gap-1.5">
           <label class="text-xs font-semibold uppercase tracking-wide text-surface-500">Centro de custo</label>
           <Select v-model="form.centroCusto" :options="centroCustoOptions" placeholder="Selecione o centro" filter fluid />
-        </div>
-        <div class="flex flex-col gap-1.5">
-          <label class="text-xs font-semibold uppercase tracking-wide text-surface-500">Conta bancária</label>
-          <Select v-model="form.conta" :options="contaOptions" placeholder="Selecione a conta" filter fluid />
         </div>
         <div class="flex flex-col gap-1.5">
           <label class="text-xs font-semibold uppercase tracking-wide text-surface-500">Vencimento</label>

@@ -81,7 +81,6 @@ model Account {
   users        User[]
   companies    Company[]
   contacts     Contact[]
-  bankAccounts BankAccount[]
   auditLogs    AuditLog[]
 
   @@map("account")
@@ -158,7 +157,6 @@ model Company {
   catalogs     CatalogValue[]
   costCenters  CostCenter[]
   feeProfiles  FeeProfile[]
-  bankAccounts BankAccount[]
   entries      Entry[]
   exits        Exit[]
   closings     Closing[]
@@ -214,26 +212,6 @@ model FeeProfile {
 
   @@index([tenantId, companyId])
   @@map("fee_profile")
-}
-
-// Conta bancária ("Contas" — confirmado no MVP pelo Figma: filtro no DRE + saldo consolidado)
-model BankAccount {
-  id             String   @id @default(uuid()) @db.Uuid
-  tenantId       String   @map("tenant_id") @db.Uuid
-  companyId      String   @map("company_id") @db.Uuid
-  name           String // "Boleto Itaú", "Caixa Loja Principal"...
-  openingBalance Decimal  @default(0) @map("opening_balance") @db.Decimal(14, 2)
-  active         Boolean  @default(true)
-  createdAt      DateTime @default(now())
-
-  account Account   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  company Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  entries Entry[]
-  exits   Exit[]
-  closings Closing[]
-
-  @@index([tenantId, companyId])
-  @@map("bank_account")
 }
 
 // ───────────────────────────── Contatos ─────────────────────────────
@@ -313,7 +291,6 @@ model Entry {
   tenantId      String  @map("tenant_id") @db.Uuid
   companyId     String  @map("company_id") @db.Uuid
   periodId      String  @map("period_id") @db.Uuid
-  bankAccountId String? @map("bank_account_id") @db.Uuid
   contactId     String? @map("contact_id") @db.Uuid // Cliente
   serviceId     String? @map("service_id") @db.Uuid // CatalogValue(SERVICE) → breakdown do DRE
   categoryId    String? @map("category_id") @db.Uuid // CatalogValue(CATEGORY) → linha do DRE
@@ -340,7 +317,6 @@ model Entry {
 
   period      Period       @relation(fields: [periodId], references: [id], onDelete: Cascade)
   company     Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  bankAccount BankAccount? @relation(fields: [bankAccountId], references: [id])
 
   @@index([tenantId, companyId, periodId])
   @@index([tenantId, companyId, categoryId])
@@ -352,7 +328,6 @@ model Exit {
   tenantId      String  @map("tenant_id") @db.Uuid
   companyId     String  @map("company_id") @db.Uuid
   periodId      String  @map("period_id") @db.Uuid
-  bankAccountId String? @map("bank_account_id") @db.Uuid
   contactId     String? @map("contact_id") @db.Uuid // Fornecedor
   costCenterId  String? @map("cost_center_id") @db.Uuid
   categoryId    String? @map("category_id") @db.Uuid
@@ -373,7 +348,6 @@ model Exit {
 
   period      Period       @relation(fields: [periodId], references: [id], onDelete: Cascade)
   company     Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  bankAccount BankAccount? @relation(fields: [bankAccountId], references: [id])
 
   @@index([tenantId, companyId, periodId])
   @@index([tenantId, companyId, categoryId])
@@ -385,7 +359,6 @@ model Closing {
   tenantId      String  @map("tenant_id") @db.Uuid
   companyId     String  @map("company_id") @db.Uuid
   periodId      String  @map("period_id") @db.Uuid
-  bankAccountId String? @map("bank_account_id") @db.Uuid
   contactId     String? @map("contact_id") @db.Uuid // Cliente
   categoryId    String? @map("category_id") @db.Uuid
   statusId      String? @map("status_id") @db.Uuid
@@ -404,7 +377,6 @@ model Closing {
 
   period      Period       @relation(fields: [periodId], references: [id], onDelete: Cascade)
   company     Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  bankAccount BankAccount? @relation(fields: [bankAccountId], references: [id])
 
   @@index([tenantId, companyId, periodId])
   @@map("closing")

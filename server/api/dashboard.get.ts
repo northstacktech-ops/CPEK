@@ -12,6 +12,7 @@ function emptyDashboard(year: number) {
       vencidos: 0,
       royalties: null as number | null,
       impostoNf: null as number | null,
+      retorno: 0,
     },
     cashFlow: Array.from({ length: 12 }, (_, index) => ({
       date: `${year}-${String(index + 1).padStart(2, '0')}-01`,
@@ -54,16 +55,19 @@ export default defineEventHandler(async (event) => {
       const faturamentoFechamentos = closings.reduce((total, item) => total + Number(item.valorFechamento), 0)
       const faturamentoBruto = faturamentoEntradas + faturamentoFechamentos
       const despesas = exits.reduce((total, item) => total + Number(item.valorDespesa), 0)
-      const lucroReal = faturamentoBruto - despesas
+      const totalRetorno = entries.reduce((total, item) => total + Number(item.retorno ?? 0), 0)
       const ticketMedio = entries.length ? faturamentoEntradas / entries.length : 0
       // Cards fiscais (configuráveis em /configuracoes): null = percentual não configurado.
       const royaltiesPercent = company?.royaltiesPercent != null ? Number(company.royaltiesPercent) : null
       const impostoNfPercent = company?.impostoNfPercent != null ? Number(company.impostoNfPercent) : null
-      const royalties = royaltiesPercent != null ? (faturamentoBruto * royaltiesPercent) / 100 : null
+      // Royalties incidem sobre o recebimento já descontado do retorno (não sobre o faturamento bruto puro).
+      const royalties = royaltiesPercent != null ? ((faturamentoBruto - totalRetorno) * royaltiesPercent) / 100 : null
       const faturamentoComNf = entries
         .filter((item) => item.notaFiscal)
         .reduce((total, item) => total + Number(item.valorServico) + Number(item.deslocamento), 0)
       const impostoNf = impostoNfPercent != null ? (faturamentoComNf * impostoNfPercent) / 100 : null
+      // Lucro real = o que sobra depois de pagar despesas, royalties, imposto e o retorno.
+      const lucroReal = faturamentoBruto - despesas - (royalties ?? 0) - (impostoNf ?? 0) - totalRetorno
       const today = new Date()
       const vencidos =
         exits
@@ -74,7 +78,7 @@ export default defineEventHandler(async (event) => {
           .reduce((total, item) => total + Number(item.valorFechamento), 0)
 
       return {
-        cards: { faturamentoBruto, despesas, lucroReal, ticketMedio, vencidos, royalties, impostoNf },
+        cards: { faturamentoBruto, despesas, lucroReal, ticketMedio, vencidos, royalties, impostoNf, retorno: totalRetorno },
         cashFlow: emptyFlow.map((point, index) => ({
           ...point,
           realized: index + 1 <= month ? lucroReal : 0,

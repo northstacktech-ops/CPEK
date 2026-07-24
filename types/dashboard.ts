@@ -9,6 +9,7 @@ export interface DashboardCards {
   // Cards fiscais (2ª linha): null = percentual não configurado em /configuracoes.
   royalties: number | null
   impostoNf: number | null
+  retorno: number
 }
 
 export interface CashFlowPoint {

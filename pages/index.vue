@@ -19,7 +19,7 @@ const dashboard = ref<DashboardData | null>(null)
 const reducedMotion = ref(false)
 
 const emptyDashboard = computed<DashboardData>(() => ({
-  cards: { faturamentoBruto: 0, despesas: 0, lucroReal: 0, ticketMedio: 0, vencidos: 0, royalties: null, impostoNf: null },
+  cards: { faturamentoBruto: 0, despesas: 0, lucroReal: 0, ticketMedio: 0, vencidos: 0, royalties: null, impostoNf: null, retorno: 0 },
   cashFlow: Array.from({ length: 12 }, (_, index) => ({
     date: `${periodStore.year}-${String(index + 1).padStart(2, '0')}-01`,
     realized: 0,
@@ -79,7 +79,7 @@ const fiscalKpis = computed(() => {
     {
       label: 'Royalties a Pagar',
       value: cards.royalties,
-      reference: 'Percentual sobre o faturamento',
+      reference: 'Percentual sobre recebimento menos retorno',
       icon: 'pi pi-building-columns',
       severity: 'warn',
     },
@@ -89,6 +89,13 @@ const fiscalKpis = computed(() => {
       reference: 'Sobre entradas com nota emitida',
       icon: 'pi pi-file-check',
       severity: 'info',
+    },
+    {
+      label: 'Total de Retorno',
+      value: cards.retorno,
+      reference: 'Base do cálculo de royalties',
+      icon: 'pi pi-undo',
+      severity: 'secondary',
     },
   ]
 })
@@ -229,7 +236,7 @@ const brl = (value: number) => value.toLocaleString('pt-BR', { style: 'currency'
         </div>
       </div>
 
-      <div class="col-span-12 grid grid-cols-1 gap-3 md:grid-cols-2">
+      <div class="col-span-12 grid grid-cols-1 gap-3 md:grid-cols-3">
         <div
           v-for="kpi in fiscalKpis"
           :key="kpi.label"

@@ -141,7 +141,7 @@ async function closePeriod(row: PeriodRow) {
 async function reopenPeriod(row: PeriodRow) {
   if (!window.confirm(`Reabrir ${row.competencia}? Novos lançamentos voltarão a ser permitidos.`)) return
   try {
-    const response = await api<{ item: PeriodRecord }>(`/api/periods/${row.id}/reopen`, { method: 'POST' })
+    const response = await api<{ item: PeriodRecord }>(`/api/periods/${row.id}/reopen`, { method: 'POST', body: { confirm: true } })
     periodos.value = periodos.value.map((item) => (item.id === row.id ? normalizePeriod(response.item) : item))
     if (activePeriodId.value === row.id) periodStore.status = response.item.status
   } catch (err) {

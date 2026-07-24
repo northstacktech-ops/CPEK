@@ -3,6 +3,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import AppBreadcrumb from '../../components/layout/AppBreadcrumb.vue'
 import PageHeader from '../../components/layout/PageHeader.vue'
 import PageContent from '../../components/layout/PageContent.vue'
+import CustomFieldsFields from '../../components/lancamentos/CustomFieldsFields.vue'
 import { useCompanyStore } from '../../stores/company'
 import { usePeriodStore } from '../../stores/period'
 
@@ -49,6 +50,7 @@ interface EntryRecord {
   feeProfileId?: string | null
   documentoNf?: string | null
   anotacoes?: string | null
+  customSnapshot?: unknown
 }
 
 interface EntryRow {
@@ -103,6 +105,7 @@ const form = ref({
   formaPagamento: null as string | null,
   documentoNf: '',
   status: 'Em Aberto',
+  custom: {} as Record<string, unknown>,
 })
 
 const fallbackStatusOptions = ['Em Aberto', 'Pago', 'Vencido', 'Cancelado']
@@ -153,6 +156,17 @@ function labelById(list: Array<CatalogOption | ContactOption | AccountOption>, i
   if (!id) return ''
   const match = list.find((item) => ('bankAccountId' in item ? item.bankAccountId === id || item.id === id : item.id === id))
   return match ? ('label' in match ? match.label : match.name) : ''
+}
+
+function customSnapshotToRecord(snapshot: unknown): Record<string, unknown> {
+  if (!Array.isArray(snapshot)) return {}
+  const record: Record<string, unknown> = {}
+  for (const item of snapshot) {
+    if (item && typeof item === 'object' && 'fieldKey' in item) {
+      record[(item as { fieldKey: string }).fieldKey] = (item as { value: unknown }).value
+    }
+  }
+  return record
 }
 
 function statusFromEntry(entry: EntryRecord) {
@@ -230,6 +244,7 @@ function resetForm() {
     formaPagamento: null,
     documentoNf: '',
     status: 'Em Aberto',
+    custom: {},
   }
 }
 
@@ -261,6 +276,7 @@ function openEdit(row: EntryRow) {
     formaPagamento: labelById(payments.value, row.raw.paymentId) || null,
     documentoNf: row.raw.documentoNf ?? '',
     status: row.status,
+    custom: customSnapshotToRecord(row.raw.customSnapshot),
   }
   drawerOpen.value = true
 }
@@ -297,6 +313,7 @@ async function saveEntry() {
       dataServico: form.value.dataCompetencia?.toISOString(),
       dataPagamento: receivedDate?.toISOString(),
       anotacoes: form.value.descricao || undefined,
+      custom: form.value.custom,
     }
 
     const response = editingId.value
@@ -528,6 +545,7 @@ onMounted(() => {
           <label class="text-xs font-semibold uppercase tracking-wide text-surface-500">Data do recebimento</label>
           <DatePicker v-model="form.dataRecebimento" date-format="dd/mm/yy" show-icon fluid />
         </div>
+        <CustomFieldsFields :company-id="company.activeId" kind="ENTRY" v-model="form.custom" />
         <div class="flex flex-col gap-1.5 md:col-span-2">
           <label class="text-xs font-semibold uppercase tracking-wide text-surface-500">Descrição</label>
           <Textarea v-model="form.descricao" rows="3" fluid />

@@ -3,6 +3,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import AppBreadcrumb from '../../components/layout/AppBreadcrumb.vue'
 import PageHeader from '../../components/layout/PageHeader.vue'
 import PageContent from '../../components/layout/PageContent.vue'
+import CustomFieldsFields from '../../components/lancamentos/CustomFieldsFields.vue'
 import { useCompanyStore } from '../../stores/company'
 import { usePeriodStore } from '../../stores/period'
 
@@ -30,6 +31,7 @@ interface ClosingRecord {
   contactId?: string | null
   categoryId?: string | null
   statusId?: string | null
+  customSnapshot?: unknown
 }
 
 interface ClosingRow {
@@ -72,6 +74,7 @@ const form = ref({
   vencimento: new Date() as Date | null,
   recebimento: null as Date | null,
   status: 'Em Aberto',
+  custom: {} as Record<string, unknown>,
 })
 
 const fallbackStatusOptions = ['Em Aberto', 'Recebido', 'Vencido', 'Cancelado']
@@ -108,6 +111,17 @@ function labelById(list: NamedOption[], id: string | null | undefined) {
   if (!id) return ''
   const match = list.find((item) => item.id === id || item.bankAccountId === id)
   return match ? labelOf(match) : ''
+}
+
+function customSnapshotToRecord(snapshot: unknown): Record<string, unknown> {
+  if (!Array.isArray(snapshot)) return {}
+  const record: Record<string, unknown> = {}
+  for (const item of snapshot) {
+    if (item && typeof item === 'object' && 'fieldKey' in item) {
+      record[(item as { fieldKey: string }).fieldKey] = (item as { value: unknown }).value
+    }
+  }
+  return record
 }
 
 function brl(value: number) {
@@ -180,6 +194,7 @@ function resetForm() {
     vencimento: new Date(),
     recebimento: null,
     status: 'Em Aberto',
+    custom: {},
   }
 }
 
@@ -202,6 +217,7 @@ function openEdit(row: ClosingRow) {
     vencimento: row.raw.dataVencPrev ? new Date(row.raw.dataVencPrev) : new Date(),
     recebimento: row.raw.dataRecebimento ? new Date(row.raw.dataRecebimento) : null,
     status: row.status,
+    custom: customSnapshotToRecord(row.raw.customSnapshot),
   }
   drawerOpen.value = true
 }
@@ -231,6 +247,7 @@ async function save() {
       dataFechamento: form.value.fechamento?.toISOString(),
       dataVencPrev: form.value.vencimento?.toISOString(),
       dataRecebimento: receivedDate?.toISOString(),
+      custom: form.value.custom,
     }
 
     const response = editingId.value
@@ -405,6 +422,7 @@ onMounted(() => {
           <label class="text-xs font-semibold uppercase tracking-wide text-surface-500">Documento (NF)</label>
           <InputText v-model="form.documentoNf" placeholder="Nº da nota fiscal / documento" fluid />
         </div>
+        <CustomFieldsFields :company-id="company.activeId" kind="CLOSING" v-model="form.custom" />
         <div class="flex flex-col gap-1.5 md:col-span-2">
           <label class="text-xs font-semibold uppercase tracking-wide text-surface-500">Descrição</label>
           <Textarea v-model="form.descricao" rows="3" fluid />

@@ -1,3 +1,5 @@
+import type { Prisma } from '@prisma/client'
+import { buildCustomSnapshot } from '../../utils/customFields'
 import { apiError, periodClosedError, requireAuth, validateBody } from '../../utils/http'
 import { withTenant } from '../../utils/withTenant'
 import { updateExitBody } from '../../utils/validators/exits'
@@ -13,8 +15,11 @@ export default defineEventHandler(async (event) => {
     if (!current) throw apiError(404, 'NOT_FOUND', 'Saída não encontrada')
     if (current.period.status === 'CLOSED') throw periodClosedError()
     const { custom, ...data } = body
-    void custom
-    const item = await tx.exit.update({ where: { id }, data })
+    const customSnapshot = custom !== undefined ? await buildCustomSnapshot(tx, current.companyId, 'EXIT', custom) : undefined
+    const item = await tx.exit.update({
+      where: { id },
+      data: { ...data, ...(customSnapshot ? { customSnapshot: customSnapshot as unknown as Prisma.InputJsonValue } : {}) },
+    })
     return { item }
   })
 })

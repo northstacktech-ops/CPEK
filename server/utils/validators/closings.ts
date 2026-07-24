@@ -10,7 +10,7 @@ export const listClosingsQuery = z.object({
 
 export const createClosingBody = z.object({
   companyId: uuid,
-  periodId: uuid,
+  periodId: uuid.optional(), // derivado automaticamente de dataFechamento (server/utils/period.ts)
   bankAccountId: uuid.optional(),
   contactId: uuid.optional(),
   categoryId: uuid.optional(),

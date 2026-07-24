@@ -10,7 +10,7 @@ export const listEntriesQuery = z.object({
 
 export const createEntryBody = z.object({
   companyId: uuid,
-  periodId: uuid,
+  periodId: uuid.optional(), // derivado automaticamente de dataServico (server/utils/period.ts)
   bankAccountId: uuid.optional(),
   contactId: uuid.optional(),
   serviceId: uuid.optional(),

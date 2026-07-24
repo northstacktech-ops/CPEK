@@ -3,6 +3,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import AppBreadcrumb from '../../components/layout/AppBreadcrumb.vue'
 import PageHeader from '../../components/layout/PageHeader.vue'
 import PageContent from '../../components/layout/PageContent.vue'
+import CustomFieldsFields from '../../components/lancamentos/CustomFieldsFields.vue'
 import { useCompanyStore } from '../../stores/company'
 import { usePeriodStore } from '../../stores/period'
 
@@ -34,6 +35,7 @@ interface ExitRecord {
   categoryId?: string | null
   costCenterId?: string | null
   paymentId?: string | null
+  customSnapshot?: unknown
 }
 
 interface ExitRow {
@@ -84,6 +86,7 @@ const form = ref({
   fornecedor: null as string | null,
   centroCusto: null as string | null,
   status: 'Em Aberto',
+  custom: {} as Record<string, unknown>,
 })
 
 const statusOptions = ['Em Aberto', 'Pago', 'Vencido', 'Cancelado']
@@ -115,6 +118,17 @@ function optionIdByLabel(list: NamedOption[], label: string | null) {
 function labelById(list: NamedOption[], id: string | null | undefined) {
   if (!id) return ''
   return labelOf(list.find((item) => item.id === id) ?? { id: '' })
+}
+
+function customSnapshotToRecord(snapshot: unknown): Record<string, unknown> {
+  if (!Array.isArray(snapshot)) return {}
+  const record: Record<string, unknown> = {}
+  for (const item of snapshot) {
+    if (item && typeof item === 'object' && 'fieldKey' in item) {
+      record[(item as { fieldKey: string }).fieldKey] = (item as { value: unknown }).value
+    }
+  }
+  return record
 }
 
 function brl(value: number) {
@@ -195,6 +209,7 @@ function resetForm() {
     fornecedor: null,
     centroCusto: null,
     status: 'Em Aberto',
+    custom: {},
   }
 }
 
@@ -221,6 +236,7 @@ function openEdit(row: ExitRow) {
     fornecedor: row.fornecedor === 'Sem fornecedor' ? null : row.fornecedor,
     centroCusto: row.centroCusto === 'Sem centro' ? null : row.centroCusto,
     status: row.status,
+    custom: customSnapshotToRecord(row.raw.customSnapshot),
   }
   drawerOpen.value = true
 }
@@ -252,6 +268,7 @@ async function save() {
       dataLancamento: form.value.dataCompetencia?.toISOString(),
       dataVencimento: form.value.dataVencimento?.toISOString(),
       dataPagamento: paidDate?.toISOString(),
+      custom: form.value.custom,
     }
 
     const response = editingId.value
@@ -441,6 +458,7 @@ onMounted(() => {
           <label class="text-xs font-semibold uppercase tracking-wide text-surface-500">Data do pagamento</label>
           <DatePicker v-model="form.dataPagamento" date-format="dd/mm/yy" show-icon fluid />
         </div>
+        <CustomFieldsFields :company-id="company.activeId" kind="EXIT" v-model="form.custom" />
         <div class="flex flex-col gap-1.5 md:col-span-2">
           <label class="text-xs font-semibold uppercase tracking-wide text-surface-500">Descrição</label>
           <Textarea v-model="form.descricao" rows="2" placeholder="Descrição curta (ex.: 1kg de café)" fluid />

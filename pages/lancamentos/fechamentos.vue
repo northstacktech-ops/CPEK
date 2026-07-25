@@ -65,6 +65,8 @@ const saving = ref(false)
 const error = ref<string | null>(null)
 const search = ref('')
 const statusFilter = ref<string | null>(null)
+const notaFiscalFilter = ref<string | null>(null)
+const notaFiscalOptions = ['Com nota fiscal', 'Sem nota fiscal']
 const drawerOpen = ref(false)
 const editingId = ref<string | null>(null)
 
@@ -100,11 +102,16 @@ const displayFieldLabel = computed(() => displayFieldOptions.value.find((o) => o
 const filtered = computed(() => {
   let result = closings.value
   if (statusFilter.value) result = result.filter((closing) => closing.status === statusFilter.value)
+  if (notaFiscalFilter.value) {
+    const wantsNf = notaFiscalFilter.value === 'Com nota fiscal'
+    result = result.filter((closing) => Boolean(closing.raw.documentoNf) === wantsNf)
+  }
   const q = search.value.trim().toLowerCase()
   if (q) {
-    result = result.filter((closing) =>
-      `${closing.cliente} ${closing.status} ${customColumnValue(closing.raw)}`.toLowerCase().includes(q),
-    )
+    result = result.filter((closing) => {
+      const nfText = closing.raw.documentoNf ? `com nota fiscal nf ${closing.raw.documentoNf}` : 'sem nota fiscal nf'
+      return `${closing.cliente} ${closing.status} ${customColumnValue(closing.raw)} ${nfText}`.toLowerCase().includes(q)
+    })
   }
   return result
 })
@@ -118,8 +125,8 @@ function labelOf(item: NamedOption) {
 }
 
 function optionIdByLabel(list: NamedOption[], label: string | null) {
-  if (!label) return undefined
-  return list.find((item) => labelOf(item) === label)?.id
+  if (!label) return null
+  return list.find((item) => labelOf(item) === label)?.id ?? null
 }
 
 function labelById(list: NamedOption[], id: string | null | undefined) {
@@ -258,17 +265,19 @@ async function save() {
     const currentPeriod = await ensure(company.activeId)
     const receivedDate = form.value.status === 'Recebido'
       ? (form.value.recebimento ?? new Date())
-      : form.value.recebimento ?? undefined
+      : (form.value.recebimento ?? null)
     const body = {
       contactId: optionIdByLabel(clients.value, form.value.cliente),
       categoryId: optionIdByLabel(categories.value, form.value.categoria),
       statusId: optionIdByLabel(statuses.value, form.value.status),
       valorFechamento: form.value.valor ?? 0,
-      descricao: form.value.descricao || undefined,
-      documentoNf: form.value.documentoNf || undefined,
+      // null (não undefined) quando o campo foi limpo: undefined = "não mexer" no PATCH,
+      // e ficaria com o valor antigo preso no banco em vez de apagar de verdade.
+      descricao: form.value.descricao || null,
+      documentoNf: form.value.documentoNf || null,
       dataFechamento: form.value.fechamento?.toISOString(),
       dataVencPrev: form.value.vencimento?.toISOString(),
-      dataRecebimento: receivedDate?.toISOString(),
+      dataRecebimento: receivedDate ? receivedDate.toISOString() : null,
       custom: form.value.custom,
     }
 
@@ -366,6 +375,7 @@ onMounted(() => {
             <InputText v-model="search" placeholder="Buscar cliente..." size="small" fluid />
           </IconField>
           <Select v-model="statusFilter" :options="statusOptions" placeholder="Status" show-clear size="small" class="w-full md:w-40" />
+          <Select v-model="notaFiscalFilter" :options="notaFiscalOptions" placeholder="Nota fiscal" show-clear size="small" class="w-full md:w-44" />
           <Select
             v-model="displayField"
             :options="displayFieldOptions"

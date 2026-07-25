@@ -82,6 +82,8 @@ const saving = ref(false)
 const error = ref<string | null>(null)
 const search = ref('')
 const statusFilter = ref<string | null>(null)
+const notaFiscalFilter = ref<string | null>(null)
+const notaFiscalOptions = ['Com nota fiscal', 'Sem nota fiscal']
 const drawerOpen = ref(false)
 const editingId = ref<string | null>(null)
 
@@ -140,11 +142,16 @@ const statusSeverity: Record<string, string> = {
 const filtered = computed(() => {
   let result = entries.value
   if (statusFilter.value) result = result.filter((entry) => entry.status === statusFilter.value)
+  if (notaFiscalFilter.value) {
+    const wantsNf = notaFiscalFilter.value === 'Com nota fiscal'
+    result = result.filter((entry) => Boolean(entry.raw.notaFiscal) === wantsNf)
+  }
   const q = search.value.trim().toLowerCase()
   if (q) {
-    result = result.filter((entry) =>
-      `${entry.cliente} ${entry.servico} ${entry.status} ${customColumnValue(entry.raw)}`.toLowerCase().includes(q),
-    )
+    result = result.filter((entry) => {
+      const nfText = entry.raw.notaFiscal ? 'com nota fiscal nf' : 'sem nota fiscal nf'
+      return `${entry.cliente} ${entry.servico} ${entry.status} ${customColumnValue(entry.raw)} ${nfText}`.toLowerCase().includes(q)
+    })
   }
   return result
 })
@@ -163,9 +170,9 @@ function formatDate(value: Date | string | null | undefined) {
 }
 
 function optionIdByLabel(list: Array<CatalogOption | ContactOption>, label: string | null) {
-  if (!label) return undefined
+  if (!label) return null
   const match = list.find((item) => ('label' in item ? item.label : item.name) === label)
-  return match?.id
+  return match?.id ?? null
 }
 
 function labelById(list: Array<CatalogOption | ContactOption>, id: string | null | undefined) {
@@ -316,9 +323,8 @@ async function saveEntry() {
 
   try {
     const currentPeriod = await ensure(company.activeId)
-    const receivedDate = form.value.jaRecebido || form.value.status === 'Pago'
-      ? (form.value.dataRecebimento ?? new Date())
-      : undefined
+    const jaRecebido = form.value.jaRecebido || form.value.status === 'Pago'
+    const receivedDate = jaRecebido ? (form.value.dataRecebimento ?? new Date()) : null
     const body = {
       contactId: optionIdByLabel(clients.value, form.value.cliente),
       serviceId: optionIdByLabel(services.value, form.value.servico),
@@ -327,15 +333,17 @@ async function saveEntry() {
       paymentId: optionIdByLabel(payments.value, form.value.formaPagamento),
       valorServico: form.value.valor ?? 0,
       deslocamento: form.value.deslocamento ?? 0,
-      pesquisa: form.value.pesquisa ?? undefined,
-      retorno: form.value.retorno ?? undefined,
+      // null (não undefined) quando o campo foi limpo: undefined = "não mexer" no PATCH,
+      // e ficaria com o valor antigo preso no banco em vez de apagar de verdade.
+      pesquisa: form.value.pesquisa,
+      retorno: form.value.retorno,
       notaFiscal: form.value.notaFiscal,
-      placa: form.value.placa || undefined,
-      modelo: form.value.modelo || undefined,
-      documentoNf: form.value.documentoNf || undefined,
+      placa: form.value.placa || null,
+      modelo: form.value.modelo || null,
+      documentoNf: form.value.documentoNf || null,
       dataServico: form.value.dataCompetencia?.toISOString(),
-      dataPagamento: receivedDate?.toISOString(),
-      anotacoes: form.value.descricao || undefined,
+      dataPagamento: receivedDate ? receivedDate.toISOString() : null,
+      anotacoes: form.value.descricao || null,
       custom: form.value.custom,
     }
 
@@ -434,6 +442,7 @@ onMounted(() => {
             <InputText v-model="search" placeholder="Buscar cliente, serviço..." size="small" fluid />
           </IconField>
           <Select v-model="statusFilter" :options="statusOptions" placeholder="Status" show-clear size="small" class="w-full md:w-40" />
+          <Select v-model="notaFiscalFilter" :options="notaFiscalOptions" placeholder="Nota fiscal" show-clear size="small" class="w-full md:w-44" />
           <Select
             v-model="displayField"
             :options="displayFieldOptions"

@@ -11,15 +11,17 @@ export const listClosingsQuery = z.object({
 export const createClosingBody = z.object({
   companyId: uuid,
   periodId: uuid.optional(), // derivado automaticamente de dataFechamento (server/utils/period.ts)
-  contactId: uuid.optional(),
-  categoryId: uuid.optional(),
-  statusId: uuid.optional(),
+  // .nullable() além de .optional(): permite o cliente limpar o campo (envia null)
+  // em vez de omiti-lo — omitir significa "não mexer", null significa "apagar".
+  contactId: uuid.nullable().optional(),
+  categoryId: uuid.nullable().optional(),
+  statusId: uuid.nullable().optional(),
   valorFechamento: money,
-  descricao: z.string().max(2000).optional(),
+  descricao: z.string().max(2000).nullable().optional(),
   dataFechamento: z.coerce.date().optional(),
-  dataVencPrev: z.coerce.date().optional(),
-  dataRecebimento: z.coerce.date().optional(),
-  documentoNf: z.string().max(60).optional(),
+  dataVencPrev: z.coerce.date().nullable().optional(),
+  dataRecebimento: z.coerce.date().nullable().optional(),
+  documentoNf: z.string().max(60).nullable().optional(),
   custom: z.record(z.string(), z.unknown()).optional(),
 })
 

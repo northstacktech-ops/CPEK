@@ -11,17 +11,19 @@ export const listExitsQuery = z.object({
 export const createExitBody = z.object({
   companyId: uuid,
   periodId: uuid.optional(), // derivado automaticamente de dataLancamento (server/utils/period.ts)
-  contactId: uuid.optional(),
-  costCenterId: uuid.optional(),
-  categoryId: uuid.optional(),
-  paymentId: uuid.optional(),
+  // .nullable() além de .optional(): permite o cliente limpar o campo (envia null)
+  // em vez de omiti-lo — omitir significa "não mexer", null significa "apagar".
+  contactId: uuid.nullable().optional(),
+  costCenterId: uuid.nullable().optional(),
+  categoryId: uuid.nullable().optional(),
+  paymentId: uuid.nullable().optional(),
   valorDespesa: money,
-  descricao: z.string().max(2000).optional(),
+  descricao: z.string().max(2000).nullable().optional(),
   dataLancamento: z.coerce.date().optional(),
-  dataVencimento: z.coerce.date().optional(),
-  dataPagamento: z.coerce.date().optional(),
-  documentoNf: z.string().max(60).optional(),
-  anotacoes: z.string().max(2000).optional(),
+  dataVencimento: z.coerce.date().nullable().optional(),
+  dataPagamento: z.coerce.date().nullable().optional(),
+  documentoNf: z.string().max(60).nullable().optional(),
+  anotacoes: z.string().max(2000).nullable().optional(),
   custom: z.record(z.string(), z.unknown()).optional(),
 })
 

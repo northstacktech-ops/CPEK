@@ -129,8 +129,8 @@ function labelOf(item: NamedOption) {
 }
 
 function optionIdByLabel(list: NamedOption[], label: string | null) {
-  if (!label) return undefined
-  return list.find((item) => labelOf(item) === label)?.id
+  if (!label) return null
+  return list.find((item) => labelOf(item) === label)?.id ?? null
 }
 
 function labelById(list: NamedOption[], id: string | null | undefined) {
@@ -278,21 +278,22 @@ async function save() {
 
   try {
     const currentPeriod = await ensure(company.activeId)
-    const paidDate = form.value.jaPago || form.value.status === 'Pago'
-      ? (form.value.dataPagamento ?? new Date())
-      : undefined
+    const jaPago = form.value.jaPago || form.value.status === 'Pago'
+    const paidDate = jaPago ? (form.value.dataPagamento ?? new Date()) : null
     const body = {
       contactId: optionIdByLabel(suppliers.value, form.value.fornecedor),
       costCenterId: optionIdByLabel(costCenters.value, form.value.centroCusto),
       categoryId: optionIdByLabel(categories.value, form.value.categoria),
       paymentId: optionIdByLabel(payments.value, form.value.formaPagamento),
       valorDespesa: form.value.valor ?? 0,
-      descricao: form.value.descricao || undefined,
-      anotacoes: form.value.anotacoes || undefined,
-      documentoNf: form.value.documentoNf || undefined,
+      // null (não undefined) quando o campo foi limpo: undefined = "não mexer" no PATCH,
+      // e ficaria com o valor antigo preso no banco em vez de apagar de verdade.
+      descricao: form.value.descricao || null,
+      anotacoes: form.value.anotacoes || null,
+      documentoNf: form.value.documentoNf || null,
       dataLancamento: form.value.dataCompetencia?.toISOString(),
       dataVencimento: form.value.dataVencimento?.toISOString(),
-      dataPagamento: paidDate?.toISOString(),
+      dataPagamento: paidDate ? paidDate.toISOString() : null,
       custom: form.value.custom,
     }
 

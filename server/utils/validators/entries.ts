@@ -11,23 +11,25 @@ export const listEntriesQuery = z.object({
 export const createEntryBody = z.object({
   companyId: uuid,
   periodId: uuid.optional(), // derivado automaticamente de dataServico (server/utils/period.ts)
-  contactId: uuid.optional(),
-  serviceId: uuid.optional(),
-  categoryId: uuid.optional(),
-  paymentId: uuid.optional(),
-  statusId: uuid.optional(),
-  feeProfileId: uuid.optional(),
+  // .nullable() além de .optional(): permite o cliente limpar o campo (envia null)
+  // em vez de omiti-lo — omitir significa "não mexer", null significa "apagar".
+  contactId: uuid.nullable().optional(),
+  serviceId: uuid.nullable().optional(),
+  categoryId: uuid.nullable().optional(),
+  paymentId: uuid.nullable().optional(),
+  statusId: uuid.nullable().optional(),
+  feeProfileId: uuid.nullable().optional(),
   valorServico: money,
   deslocamento: money.default(0),
-  pesquisa: money.optional(),
-  retorno: money.optional(),
+  pesquisa: money.nullable().optional(),
+  retorno: money.nullable().optional(),
   notaFiscal: z.boolean().optional(),
-  placa: z.string().max(16).optional(),
-  modelo: z.string().max(120).optional(),
+  placa: z.string().max(16).nullable().optional(),
+  modelo: z.string().max(120).nullable().optional(),
   dataServico: z.coerce.date().optional(),
-  dataPagamento: z.coerce.date().optional(),
-  documentoNf: z.string().max(60).optional(),
-  anotacoes: z.string().max(2000).optional(),
+  dataPagamento: z.coerce.date().nullable().optional(),
+  documentoNf: z.string().max(60).nullable().optional(),
+  anotacoes: z.string().max(2000).nullable().optional(),
   // Campos custom dinâmicos (§6): { fieldKey: value }. Validados no servidor.
   custom: z.record(z.string(), z.unknown()).optional(),
 })

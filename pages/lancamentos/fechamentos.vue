@@ -372,7 +372,7 @@ onMounted(() => {
         <div class="mb-3 flex flex-col gap-2 md:flex-row md:items-center">
           <IconField class="w-full md:w-64">
             <InputIcon class="pi pi-search" />
-            <InputText v-model="search" placeholder="Buscar cliente..." size="small" fluid />
+            <InputText v-model="search" placeholder="Buscar cliente ou nota fiscal..." size="small" fluid />
           </IconField>
           <Select v-model="statusFilter" :options="statusOptions" placeholder="Status" show-clear size="small" class="w-full md:w-40" />
           <Select v-model="notaFiscalFilter" :options="notaFiscalOptions" placeholder="Nota fiscal" show-clear size="small" class="w-full md:w-44" />

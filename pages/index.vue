@@ -19,7 +19,7 @@ const dashboard = ref<DashboardData | null>(null)
 const reducedMotion = ref(false)
 
 const emptyDashboard = computed<DashboardData>(() => ({
-  cards: { faturamentoBruto: 0, despesas: 0, lucroReal: 0, ticketMedio: 0, vencidos: 0, royalties: null, impostoNf: null, retorno: 0 },
+  cards: { faturamentoBruto: 0, despesas: 0, lucroReal: 0, ticketMedio: 0, vencidos: 0, royalties: null, impostoNf: null, retorno: 0, pesquisa: 0 },
   cashFlow: Array.from({ length: 12 }, (_, index) => ({
     date: `${periodStore.year}-${String(index + 1).padStart(2, '0')}-01`,
     realized: 0,
@@ -95,6 +95,13 @@ const fiscalKpis = computed(() => {
       value: cards.retorno,
       reference: 'Base do cálculo de royalties',
       icon: 'pi pi-undo',
+      severity: 'secondary',
+    },
+    {
+      label: 'Total de Pesquisa',
+      value: cards.pesquisa,
+      reference: 'Descontado do lucro real',
+      icon: 'pi pi-search',
       severity: 'secondary',
     },
   ]
@@ -236,7 +243,7 @@ const brl = (value: number) => value.toLocaleString('pt-BR', { style: 'currency'
         </div>
       </div>
 
-      <div class="col-span-12 grid grid-cols-1 gap-3 md:grid-cols-3">
+      <div class="col-span-12 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
         <div
           v-for="kpi in fiscalKpis"
           :key="kpi.label"

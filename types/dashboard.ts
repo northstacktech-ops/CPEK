@@ -10,6 +10,7 @@ export interface DashboardCards {
   royalties: number | null
   impostoNf: number | null
   retorno: number
+  pesquisa: number
 }
 
 export interface CashFlowPoint {

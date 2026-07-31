@@ -8,7 +8,7 @@ export default defineEventHandler(async (event) => {
 
   return withTenant(auth.tenantId, async (tx) => {
     const items = await tx.feeProfile.findMany({
-      where: { companyId: query.companyId },
+      where: { companyId: query.companyId, ...(query.includeInactive ? {} : { active: true }) },
       orderBy: { label: 'asc' },
     })
     return { items: items.map((item) => ({ ...item, value: Number(item.value) })) }

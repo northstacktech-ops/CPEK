@@ -42,6 +42,7 @@ const drawerOpen = ref(false)
 const editingId = ref<string | null>(null)
 
 const contacts = ref<ContactRow[]>([])
+const showInactive = ref(false)
 const form = ref({ nome: '', tipo: 'Cliente', contato: '', telefone: '', email: '', cpfCnpj: '', endereco: '', obs: '' })
 const tipoOptions = ['Cliente', 'Fornecedor']
 const statusSeverity: Record<string, string> = { Ativo: 'success', Inativo: 'secondary' }
@@ -92,7 +93,7 @@ async function loadContacts() {
 
   try {
     const response = await api<{ items: ContactRecord[] }>('/api/contacts', {
-      query: { companyId: company.activeId },
+      query: { companyId: company.activeId, includeInactive: showInactive.value },
     })
     contacts.value = response.items.map(normalizeContact)
   } catch (err) {
@@ -180,13 +181,31 @@ async function toggleStatus(row: ContactRow) {
       method: 'PATCH',
       body: { active: nextActive },
     })
-    contacts.value = contacts.value.map((contact) =>
-      contact.id === row.id ? normalizeContact({ ...row.raw, ...response.item, active: nextActive }) : contact,
-    )
+    if (!nextActive && !showInactive.value) {
+      contacts.value = contacts.value.filter((contact) => contact.id !== row.id)
+    } else {
+      contacts.value = contacts.value.map((contact) =>
+        contact.id === row.id ? normalizeContact({ ...row.raw, ...response.item, active: nextActive }) : contact,
+      )
+    }
   } catch (err) {
     error.value = apiErrorMessage(err, 'Não foi possível alterar o status do contato.')
   }
 }
+
+async function deleteForever(row: ContactRow) {
+  if (!window.confirm(`Apagar "${row.nome}" de vez? Só é possível se ele nunca foi usado em nenhum lançamento.`)) return
+  try {
+    await api<{ ok: boolean }>(`/api/contacts/${row.id}`, { method: 'DELETE' })
+    contacts.value = contacts.value.filter((contact) => contact.id !== row.id)
+  } catch (err) {
+    error.value = apiErrorMessage(err, 'Não foi possível apagar o contato.')
+  }
+}
+
+watch(showInactive, () => {
+  void loadContacts()
+})
 
 watch(
   () => company.activeId,
@@ -230,10 +249,16 @@ onMounted(() => {
               </TabList>
             </Tabs>
 
-            <IconField class="w-full md:w-80">
-              <InputIcon class="pi pi-search" />
-              <InputText v-model="search" :placeholder="`Buscar ${currentTypePlural}`" size="small" fluid />
-            </IconField>
+            <div class="flex items-center gap-3">
+              <div class="flex items-center gap-2">
+                <ToggleSwitch v-model="showInactive" input-id="show-inactive-contacts" />
+                <label for="show-inactive-contacts" class="text-sm text-surface-500">Mostrar bloqueados</label>
+              </div>
+              <IconField class="w-full md:w-80">
+                <InputIcon class="pi pi-search" />
+                <InputText v-model="search" :placeholder="`Buscar ${currentTypePlural}`" size="small" fluid />
+              </IconField>
+            </div>
           </div>
 
           <UiTableSkeleton v-if="loading" :rows="6" :columns="6" />
@@ -259,7 +284,7 @@ onMounted(() => {
                 <Tag :value="data.status" :severity="statusSeverity[data.status]" />
               </template>
             </Column>
-            <Column header="" style="width:5rem" body-class="text-right" align-frozen="right" frozen>
+            <Column header="" style="width:7rem" body-class="text-right" align-frozen="right" frozen>
               <template #body="{ data }">
                 <div class="flex justify-end gap-1">
                   <Button icon="pi pi-pencil" text rounded size="small" severity="secondary" aria-label="Editar contato" @click="openEdit(data)" />
@@ -268,10 +293,11 @@ onMounted(() => {
                     text
                     rounded
                     size="small"
-                    :severity="data.status === 'Ativo' ? 'secondary' : 'success'"
-                    :aria-label="data.status === 'Ativo' ? 'Desativar contato' : 'Reativar contato'"
+                    :severity="data.status === 'Ativo' ? 'warn' : 'success'"
+                    :aria-label="data.status === 'Ativo' ? 'Bloquear contato' : 'Reativar contato'"
                     @click="toggleStatus(data)"
                   />
+                  <Button icon="pi pi-trash" text rounded size="small" severity="danger" aria-label="Apagar contato" @click="deleteForever(data)" />
                 </div>
               </template>
             </Column>

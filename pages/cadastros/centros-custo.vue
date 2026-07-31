@@ -22,6 +22,7 @@ const saving = ref(false)
 const error = ref<string | null>(null)
 const form = ref({ label: '', costType: 'FIXED' as 'FIXED' | 'VARIABLE', active: true })
 const items = ref<CostCenter[]>([])
+const showInactive = ref(false)
 
 const tipoOptions = [
   { label: 'Fixo', value: 'FIXED' },
@@ -39,12 +40,38 @@ async function loadItems() {
   loading.value = true
   error.value = null
   try {
-    const response = await api<{ items: CostCenter[] }>('/api/cost-centers', { query: { companyId: company.activeId } })
+    const response = await api<{ items: CostCenter[] }>('/api/cost-centers', {
+      query: { companyId: company.activeId, includeInactive: showInactive.value },
+    })
     items.value = response.items
   } catch (err) {
     error.value = apiErrorMessage(err, 'Não foi possível carregar os centros de custo.')
   } finally {
     loading.value = false
+  }
+}
+
+async function block(item: CostCenter) {
+  if (!window.confirm(`Bloquear "${item.label}"? Ele deixa de aparecer nas listas e seletores.`)) return
+  try {
+    await api<{ item: CostCenter }>(`/api/cost-centers/${item.id}`, { method: 'PATCH', body: { active: false } })
+    if (showInactive.value) {
+      items.value = items.value.map((current) => (current.id === item.id ? { ...current, active: false } : current))
+    } else {
+      items.value = items.value.filter((current) => current.id !== item.id)
+    }
+  } catch (err) {
+    error.value = apiErrorMessage(err, 'Não foi possível bloquear o centro de custo.')
+  }
+}
+
+async function deleteForever(item: CostCenter) {
+  if (!window.confirm(`Apagar "${item.label}" de vez? Só é possível se ele nunca foi usado em nenhuma saída.`)) return
+  try {
+    await api<{ ok: boolean }>(`/api/cost-centers/${item.id}`, { method: 'DELETE' })
+    items.value = items.value.filter((current) => current.id !== item.id)
+  } catch (err) {
+    error.value = apiErrorMessage(err, 'Não foi possível apagar o centro de custo.')
   }
 }
 
@@ -94,6 +121,10 @@ watch(() => company.activeId, () => {
   void loadItems()
 })
 
+watch(showInactive, () => {
+  void loadItems()
+})
+
 onMounted(() => {
   void loadItems()
 })
@@ -113,6 +144,11 @@ onMounted(() => {
     <PageContent>
       <Message v-if="error" severity="error" size="small" class="col-span-12">{{ error }}</Message>
 
+      <div class="col-span-12 flex items-center justify-end gap-2">
+        <ToggleSwitch v-model="showInactive" input-id="show-inactive-cc" />
+        <label for="show-inactive-cc" class="text-sm text-surface-500">Mostrar bloqueados</label>
+      </div>
+
       <div class="col-span-12">
         <UiTableSkeleton v-if="loading" :rows="6" :columns="4" />
 
@@ -124,9 +160,13 @@ onMounted(() => {
           <Column field="active" header="Status" style="width:8rem">
             <template #body="{ data }"><Tag :value="data.active === false ? 'Inativo' : 'Ativo'" :severity="data.active === false ? 'secondary' : 'success'" /></template>
           </Column>
-          <Column header="" style="width:5rem" body-class="text-right">
+          <Column header="" style="width:8rem" body-class="text-right">
             <template #body="{ data }">
-              <Button icon="pi pi-pencil" text rounded size="small" severity="secondary" aria-label="Editar centro" @click="openEdit(data)" />
+              <div class="flex justify-end gap-1">
+                <Button icon="pi pi-pencil" text rounded size="small" severity="secondary" aria-label="Editar centro" @click="openEdit(data)" />
+                <Button v-if="data.active !== false" icon="pi pi-ban" text rounded size="small" severity="warn" aria-label="Bloquear centro" @click="block(data)" />
+                <Button icon="pi pi-trash" text rounded size="small" severity="danger" aria-label="Apagar centro" @click="deleteForever(data)" />
+              </div>
             </template>
           </Column>
           <template #empty>

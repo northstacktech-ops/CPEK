@@ -1,8 +1,8 @@
 // CPEK — validators de Centros de Custo (ARCHITECTURE §5, §8).
 import { z } from 'zod'
-import { uuid } from './common'
+import { boolQuery, uuid } from './common'
 
-export const listCostCentersQuery = z.object({ companyId: uuid })
+export const listCostCentersQuery = z.object({ companyId: uuid, includeInactive: boolQuery })
 
 export const createCostCenterBody = z.object({
   companyId: uuid,

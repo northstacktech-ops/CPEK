@@ -1,10 +1,11 @@
 // CPEK — validators de Contatos (clientes/fornecedores) (ARCHITECTURE §5, §8).
 import { z } from 'zod'
-import { uuid } from './common'
+import { boolQuery, uuid } from './common'
 
 export const listContactsQuery = z.object({
   companyId: uuid.optional(),
   type: z.enum(['CLIENT', 'SUPPLIER']).optional(),
+  includeInactive: boolQuery,
 })
 
 export const createContactBody = z.object({

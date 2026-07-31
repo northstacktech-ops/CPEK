@@ -29,8 +29,9 @@ const error = ref<string | null>(null)
 const drawerOpen = ref(false)
 const editingId = ref<string | null>(null)
 const items = ref<CustomField[]>([])
+const showInactive = ref(false)
 
-const form = ref({ label: '', dataType: 'TEXT' as DataType, kind: 'ENTRY' as Kind, required: false })
+const form = ref({ label: '', dataType: 'TEXT' as DataType, kind: 'ENTRY' as Kind, required: false, active: true })
 
 const dataTypeOptions = [
   { label: 'Texto', value: 'TEXT' },
@@ -64,7 +65,9 @@ async function loadItems() {
   loading.value = true
   error.value = null
   try {
-    const response = await api<{ items: CustomField[] }>('/api/custom-fields', { query: { companyId: company.activeId } })
+    const response = await api<{ items: CustomField[] }>('/api/custom-fields', {
+      query: { companyId: company.activeId, includeInactive: showInactive.value },
+    })
     items.value = response.items
   } catch (err) {
     error.value = apiErrorMessage(err, 'Não foi possível carregar os campos personalizados.')
@@ -75,13 +78,13 @@ async function loadItems() {
 
 function openNew() {
   editingId.value = null
-  form.value = { label: '', dataType: 'TEXT', kind: 'ENTRY', required: false }
+  form.value = { label: '', dataType: 'TEXT', kind: 'ENTRY', required: false, active: true }
   drawerOpen.value = true
 }
 
 function openEdit(row: CustomField) {
   editingId.value = row.id
-  form.value = { label: row.label, dataType: row.dataType, kind: row.kind, required: row.required }
+  form.value = { label: row.label, dataType: row.dataType, kind: row.kind, required: row.required, active: row.active !== false }
   drawerOpen.value = true
 }
 
@@ -99,9 +102,21 @@ async function save() {
   error.value = null
   try {
     if (editingId.value) {
-      const body = { label: form.value.label, dataType: form.value.dataType, required: form.value.required, confirm: true as const }
+      const body = {
+        label: form.value.label,
+        dataType: form.value.dataType,
+        required: form.value.required,
+        active: form.value.active,
+        confirm: true as const,
+      }
       const response = await api<{ item: CustomField }>(`/api/custom-fields/${editingId.value}`, { method: 'PATCH', body })
-      items.value = items.value.map((item) => (item.id === editingId.value ? { ...item, ...response.item } : item))
+      if (showInactive.value) {
+        items.value = items.value.map((item) => (item.id === editingId.value ? { ...item, ...response.item } : item))
+      } else {
+        items.value = response.item.active === false
+          ? items.value.filter((item) => item.id !== editingId.value)
+          : items.value.map((item) => (item.id === editingId.value ? { ...item, ...response.item } : item))
+      }
     } else {
       const body = {
         companyId: company.activeId,
@@ -122,17 +137,33 @@ async function save() {
   }
 }
 
-async function deleteItem(id: string) {
-  if (!window.confirm('Remover este campo personalizado?')) return
+async function block(item: CustomField) {
+  if (!window.confirm(`Bloquear "${item.label}"? Ele some dos formulários de novos lançamentos, mas o histórico continua íntegro.`)) return
   try {
-    await api<{ ok: boolean }>(`/api/custom-fields/${id}`, { method: 'DELETE' })
-    items.value = items.value.filter((item) => item.id !== id)
+    const body = { active: false, confirm: true as const }
+    await api<{ item: CustomField }>(`/api/custom-fields/${item.id}`, { method: 'PATCH', body })
+    if (showInactive.value) {
+      items.value = items.value.map((current) => (current.id === item.id ? { ...current, active: false } : current))
+    } else {
+      items.value = items.value.filter((current) => current.id !== item.id)
+    }
   } catch (err) {
-    error.value = apiErrorMessage(err, 'Não foi possível remover o campo.')
+    error.value = apiErrorMessage(err, 'Não foi possível bloquear o campo.')
+  }
+}
+
+async function deleteForever(item: CustomField) {
+  if (!window.confirm(`Apagar "${item.label}" de vez? Lançamentos antigos continuam mostrando o valor gravado; o campo só some dos formulários novos.`)) return
+  try {
+    await api<{ ok: boolean }>(`/api/custom-fields/${item.id}`, { method: 'DELETE' })
+    items.value = items.value.filter((current) => current.id !== item.id)
+  } catch (err) {
+    error.value = apiErrorMessage(err, 'Não foi possível apagar o campo.')
   }
 }
 
 watch(() => company.activeId, () => { void loadItems() })
+watch(showInactive, () => { void loadItems() })
 onMounted(() => { void loadItems() })
 </script>
 
@@ -149,8 +180,13 @@ onMounted(() => { void loadItems() })
     <PageContent>
       <Message v-if="error" severity="error" size="small" class="col-span-12">{{ error }}</Message>
 
+      <div class="col-span-12 flex items-center justify-end gap-2">
+        <ToggleSwitch v-model="showInactive" input-id="show-inactive-cf" />
+        <label for="show-inactive-cf" class="text-sm text-surface-500">Mostrar bloqueados</label>
+      </div>
+
       <div class="col-span-12">
-        <UiTableSkeleton v-if="loading" :rows="6" :columns="5" />
+        <UiTableSkeleton v-if="loading" :rows="6" :columns="6" />
 
         <DataTable v-else :value="orderedItems" data-key="id" size="small" class="cpek-table">
           <Column field="label" header="Nome" sortable />
@@ -165,11 +201,15 @@ onMounted(() => { void loadItems() })
               <i :class="data.required ? 'pi pi-check text-green-500' : 'pi pi-minus text-surface-300'" />
             </template>
           </Column>
-          <Column header="" style="width:5rem" body-class="text-right">
+          <Column field="active" header="Status" style="width:8rem">
+            <template #body="{ data }"><Tag :value="data.active === false ? 'Inativo' : 'Ativo'" :severity="data.active === false ? 'secondary' : 'success'" /></template>
+          </Column>
+          <Column header="" style="width:8rem" body-class="text-right">
             <template #body="{ data }">
               <div class="flex justify-end gap-1">
                 <Button icon="pi pi-pencil" text rounded size="small" severity="secondary" aria-label="Editar campo" @click="openEdit(data)" />
-                <Button icon="pi pi-trash" text rounded size="small" severity="danger" aria-label="Remover campo" @click="deleteItem(data.id)" />
+                <Button v-if="data.active !== false" icon="pi pi-ban" text rounded size="small" severity="warn" aria-label="Bloquear campo" @click="block(data)" />
+                <Button icon="pi pi-trash" text rounded size="small" severity="danger" aria-label="Apagar campo" @click="deleteForever(data)" />
               </div>
             </template>
           </Column>
@@ -197,6 +237,10 @@ onMounted(() => { void loadItems() })
         <div class="flex items-center gap-3">
           <label class="text-xs font-semibold uppercase tracking-wide text-surface-500">Obrigatório</label>
           <ToggleSwitch v-model="form.required" />
+        </div>
+        <div class="flex items-center gap-2">
+          <ToggleSwitch v-model="form.active" input-id="custom-field-active" />
+          <label for="custom-field-active" class="text-sm">Campo ativo</label>
         </div>
       </form>
       <template #footer>

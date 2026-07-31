@@ -12,6 +12,7 @@ interface NamedOption {
   label?: string
   name?: string
   costType?: string
+  active?: boolean
 }
 
 interface CustomFieldOption {
@@ -102,10 +103,12 @@ const form = ref({
 })
 
 const statusOptions = ['Em Aberto', 'Pago', 'Vencido', 'Cancelado']
-const categoriaOptions = computed(() => categories.value.map(labelOf))
-const fornecedorOptions = computed(() => suppliers.value.map(labelOf))
-const centroCustoOptions = computed(() => costCenters.value.map(labelOf))
-const pagamentoOptions = computed(() => payments.value.map(labelOf))
+// Listas completas trazem inativos (pra resolver rótulo de lançamentos antigos
+// via labelOf/labelById) — mas cadastro bloqueado não pode virar opção nova.
+const categoriaOptions = computed(() => categories.value.filter((item) => item.active !== false).map(labelOf))
+const fornecedorOptions = computed(() => suppliers.value.filter((item) => item.active !== false).map(labelOf))
+const centroCustoOptions = computed(() => costCenters.value.filter((item) => item.active !== false).map(labelOf))
+const pagamentoOptions = computed(() => payments.value.filter((item) => item.active !== false).map(labelOf))
 const statusSeverity: Record<string, string> = { Pago: 'success', 'Em Aberto': 'info', Vencido: 'danger', Cancelado: 'secondary' }
 
 const displayFieldOptions = computed(() => customFieldDefs.value.map((f) => ({ value: f.fieldKey, label: f.label })))
@@ -196,11 +199,11 @@ async function loadExits() {
   try {
     const [currentPeriod, categoryRes, supplierRes, costCenterRes, paymentRes, customFieldRes] = await Promise.all([
       ensure(company.activeId),
-      api<{ items: NamedOption[] }>('/api/catalogs', { query: { companyId: company.activeId, kind: 'CATEGORY' } }),
-      api<{ items: NamedOption[] }>('/api/contacts', { query: { companyId: company.activeId, type: 'SUPPLIER' } }),
-      api<{ items: NamedOption[] }>('/api/cost-centers', { query: { companyId: company.activeId } }),
-      api<{ items: NamedOption[] }>('/api/catalogs', { query: { companyId: company.activeId, kind: 'PAYMENT_METHOD' } }),
-      api<{ items: CustomFieldOption[] }>('/api/custom-fields', { query: { companyId: company.activeId, kind: 'EXIT' } }),
+      api<{ items: NamedOption[] }>('/api/catalogs', { query: { companyId: company.activeId, kind: 'CATEGORY', includeInactive: true } }),
+      api<{ items: NamedOption[] }>('/api/contacts', { query: { companyId: company.activeId, type: 'SUPPLIER', includeInactive: true } }),
+      api<{ items: NamedOption[] }>('/api/cost-centers', { query: { companyId: company.activeId, includeInactive: true } }),
+      api<{ items: NamedOption[] }>('/api/catalogs', { query: { companyId: company.activeId, kind: 'PAYMENT_METHOD', includeInactive: true } }),
+      api<{ items: CustomFieldOption[] }>('/api/custom-fields', { query: { companyId: company.activeId, kind: 'EXIT', includeInactive: true } }),
     ])
 
     categories.value = categoryRes.items

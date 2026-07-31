@@ -1,7 +1,7 @@
 // CPEK — validators de Catálogos (forma de pagamento, serviço, status, categoria).
 // ARCHITECTURE §5, §8. CATEGORY carrega dreGroup (§7).
 import { z } from 'zod'
-import { uuid } from './common'
+import { boolQuery, uuid } from './common'
 
 export const catalogKind = z.enum(['PAYMENT_METHOD', 'SERVICE', 'STATUS', 'CATEGORY'])
 export const dreGroup = z.enum([
@@ -13,7 +13,11 @@ export const dreGroup = z.enum([
   'FINANCING',
 ])
 
-export const listCatalogsQuery = z.object({ companyId: uuid, kind: catalogKind.optional() })
+export const listCatalogsQuery = z.object({
+  companyId: uuid,
+  kind: catalogKind.optional(),
+  includeInactive: boolQuery,
+})
 
 export const createCatalogBody = z
   .object({

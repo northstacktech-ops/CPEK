@@ -23,6 +23,7 @@ const saving = ref(false)
 const error = ref<string | null>(null)
 const form = ref({ label: '', feeType: 'PERCENTAGE' as 'PERCENTAGE' | 'FIXED', value: null as number | null, active: true })
 const items = ref<FeeProfile[]>([])
+const showInactive = ref(false)
 
 const typeOptions = [
   { label: 'Percentual', value: 'PERCENTAGE' },
@@ -46,12 +47,38 @@ async function loadItems() {
   loading.value = true
   error.value = null
   try {
-    const response = await api<{ items: FeeProfile[] }>('/api/fee-profiles', { query: { companyId: company.activeId } })
+    const response = await api<{ items: FeeProfile[] }>('/api/fee-profiles', {
+      query: { companyId: company.activeId, includeInactive: showInactive.value },
+    })
     items.value = response.items
   } catch (err) {
     error.value = apiErrorMessage(err, 'Não foi possível carregar as taxas.')
   } finally {
     loading.value = false
+  }
+}
+
+async function block(item: FeeProfile) {
+  if (!window.confirm(`Bloquear "${item.label}"? Ele deixa de aparecer nas listas e seletores.`)) return
+  try {
+    await api<{ item: FeeProfile }>(`/api/fee-profiles/${item.id}`, { method: 'PATCH', body: { active: false } })
+    if (showInactive.value) {
+      items.value = items.value.map((current) => (current.id === item.id ? { ...current, active: false } : current))
+    } else {
+      items.value = items.value.filter((current) => current.id !== item.id)
+    }
+  } catch (err) {
+    error.value = apiErrorMessage(err, 'Não foi possível bloquear a taxa.')
+  }
+}
+
+async function deleteForever(item: FeeProfile) {
+  if (!window.confirm(`Apagar "${item.label}" de vez? Só é possível se ela nunca foi usada em nenhuma entrada.`)) return
+  try {
+    await api<{ ok: boolean }>(`/api/fee-profiles/${item.id}`, { method: 'DELETE' })
+    items.value = items.value.filter((current) => current.id !== item.id)
+  } catch (err) {
+    error.value = apiErrorMessage(err, 'Não foi possível apagar a taxa.')
   }
 }
 
@@ -106,6 +133,10 @@ watch(() => company.activeId, () => {
   void loadItems()
 })
 
+watch(showInactive, () => {
+  void loadItems()
+})
+
 onMounted(() => {
   void loadItems()
 })
@@ -125,6 +156,11 @@ onMounted(() => {
     <PageContent>
       <Message v-if="error" severity="error" size="small" class="col-span-12">{{ error }}</Message>
 
+      <div class="col-span-12 flex items-center justify-end gap-2">
+        <ToggleSwitch v-model="showInactive" input-id="show-inactive-fee" />
+        <label for="show-inactive-fee" class="text-sm text-surface-500">Mostrar bloqueados</label>
+      </div>
+
       <div class="col-span-12">
         <UiTableSkeleton v-if="loading" :rows="6" :columns="5" />
 
@@ -139,9 +175,13 @@ onMounted(() => {
           <Column field="active" header="Status" style="width:8rem">
             <template #body="{ data }"><Tag :value="data.active === false ? 'Inativo' : 'Ativo'" :severity="data.active === false ? 'secondary' : 'success'" /></template>
           </Column>
-          <Column header="" style="width:5rem" body-class="text-right">
+          <Column header="" style="width:8rem" body-class="text-right">
             <template #body="{ data }">
-              <Button icon="pi pi-pencil" text rounded size="small" severity="secondary" aria-label="Editar taxa" @click="openEdit(data)" />
+              <div class="flex justify-end gap-1">
+                <Button icon="pi pi-pencil" text rounded size="small" severity="secondary" aria-label="Editar taxa" @click="openEdit(data)" />
+                <Button v-if="data.active !== false" icon="pi pi-ban" text rounded size="small" severity="warn" aria-label="Bloquear taxa" @click="block(data)" />
+                <Button icon="pi pi-trash" text rounded size="small" severity="danger" aria-label="Apagar taxa" @click="deleteForever(data)" />
+              </div>
             </template>
           </Column>
           <template #empty>

@@ -5,6 +5,12 @@ import { z } from 'zod'
 export const uuid = z.string().uuid()
 export const money = z.number().finite() // Decimal(14,2) no banco; nunca Float lá
 export const isoDate = z.string().datetime({ offset: true }).or(z.coerce.date())
+// Query string vem sempre como string ("true"/"false") — z.coerce.boolean()
+// trataria qualquer string não-vazia (incluindo "false") como true.
+export const boolQuery = z
+  .enum(['true', 'false'])
+  .optional()
+  .transform((v) => v === 'true')
 
 export const paginationQuery = z.object({
   page: z.coerce.number().int().min(1).default(1),

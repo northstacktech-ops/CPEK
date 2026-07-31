@@ -11,6 +11,7 @@ export default defineEventHandler(async (event) => {
       where: {
         ...(query.companyId ? { companyId: query.companyId } : {}),
         ...(query.type ? { type: query.type } : {}),
+        ...(query.includeInactive ? {} : { active: true }),
       },
       orderBy: { name: 'asc' },
     })

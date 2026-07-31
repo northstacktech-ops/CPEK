@@ -8,7 +8,11 @@ export default defineEventHandler(async (event) => {
 
   return withTenant(auth.tenantId, async (tx) => {
     const items = await tx.catalogValue.findMany({
-      where: { companyId: query.companyId, ...(query.kind ? { kind: query.kind } : {}) },
+      where: {
+        companyId: query.companyId,
+        ...(query.kind ? { kind: query.kind } : {}),
+        ...(query.includeInactive ? {} : { active: true }),
+      },
       orderBy: [{ kind: 'asc' }, { order: 'asc' }, { label: 'asc' }],
     })
     return { items }

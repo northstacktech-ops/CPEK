@@ -8,7 +8,11 @@ export default defineEventHandler(async (event) => {
 
   return withTenant(auth.tenantId, async (tx) => {
     const items = await tx.customField.findMany({
-      where: { companyId: query.companyId, ...(query.kind ? { kind: query.kind } : {}) },
+      where: {
+        companyId: query.companyId,
+        ...(query.kind ? { kind: query.kind } : {}),
+        ...(query.includeInactive ? {} : { active: true }),
+      },
       orderBy: { order: 'asc' },
     })
     return { items }

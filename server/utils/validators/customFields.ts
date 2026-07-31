@@ -1,10 +1,11 @@
 // CPEK — validators de Campos custom (ARCHITECTURE §6, §8).
 import { z } from 'zod'
-import { uuid } from './common'
+import { boolQuery, uuid } from './common'
 
 export const listCustomFieldsQuery = z.object({
   companyId: uuid,
   kind: z.enum(['ENTRY', 'EXIT', 'CLOSING']).optional(),
+  includeInactive: boolQuery,
 })
 
 export const createCustomFieldBody = z.object({

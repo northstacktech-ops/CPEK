@@ -31,6 +31,7 @@ const error = ref<string | null>(null)
 const dialogOpen = ref(false)
 const editingId = ref<string | null>(null)
 const items = ref<CatalogItem[]>([])
+const showInactive = ref(false)
 const form = ref({ label: '', order: 0, dreGroup: 'OPERATING_REVENUE', active: true })
 
 const dreGroupOptions = [
@@ -57,7 +58,7 @@ async function loadItems() {
 
   try {
     const response = await api<{ items: CatalogItem[] }>('/api/catalogs', {
-      query: { companyId: company.activeId, kind: props.kind },
+      query: { companyId: company.activeId, kind: props.kind, includeInactive: showInactive.value },
     })
     items.value = response.items
   } catch (err) {
@@ -120,15 +121,33 @@ async function save() {
   }
 }
 
-async function remove(item: CatalogItem) {
-  if (!window.confirm(`Desativar "${item.label}"?`)) return
+async function block(item: CatalogItem) {
+  if (!window.confirm(`Bloquear "${item.label}"? Ele deixa de aparecer nas listas e seletores.`)) return
   try {
-    await api<{ ok: boolean }>(`/api/catalogs/${item.id}`, { method: 'DELETE' })
-    items.value = items.value.map((current) => (current.id === item.id ? { ...current, active: false } : current))
+    await api<{ item: CatalogItem }>(`/api/catalogs/${item.id}`, { method: 'PATCH', body: { active: false } })
+    if (showInactive.value) {
+      items.value = items.value.map((current) => (current.id === item.id ? { ...current, active: false } : current))
+    } else {
+      items.value = items.value.filter((current) => current.id !== item.id)
+    }
   } catch (err) {
-    error.value = apiErrorMessage(err, 'Não foi possível desativar o cadastro.')
+    error.value = apiErrorMessage(err, 'Não foi possível bloquear o cadastro.')
   }
 }
+
+async function deleteForever(item: CatalogItem) {
+  if (!window.confirm(`Apagar "${item.label}" de vez? Só é possível se ele nunca foi usado em nenhum lançamento.`)) return
+  try {
+    await api<{ ok: boolean }>(`/api/catalogs/${item.id}`, { method: 'DELETE' })
+    items.value = items.value.filter((current) => current.id !== item.id)
+  } catch (err) {
+    error.value = apiErrorMessage(err, 'Não foi possível apagar o cadastro.')
+  }
+}
+
+watch(showInactive, () => {
+  void loadItems()
+})
 
 watch(() => company.activeId, () => {
   void loadItems()
@@ -153,6 +172,11 @@ onMounted(() => {
     <PageContent>
       <Message v-if="error" severity="error" size="small" class="col-span-12">{{ error }}</Message>
 
+      <div class="col-span-12 flex items-center justify-end gap-2">
+        <ToggleSwitch v-model="showInactive" input-id="show-inactive" />
+        <label for="show-inactive" class="text-sm text-surface-500">Mostrar bloqueados</label>
+      </div>
+
       <div class="col-span-12">
         <UiTableSkeleton v-if="loading" :rows="6" :columns="4" />
 
@@ -167,11 +191,12 @@ onMounted(() => {
               <Tag :value="data.active === false ? 'Inativo' : 'Ativo'" :severity="data.active === false ? 'secondary' : 'success'" />
             </template>
           </Column>
-          <Column header="" style="width:6rem" body-class="text-right">
+          <Column header="" style="width:8rem" body-class="text-right">
             <template #body="{ data }">
               <div class="flex justify-end gap-1">
                 <Button icon="pi pi-pencil" text rounded size="small" severity="secondary" aria-label="Editar" @click="openEdit(data)" />
-                <Button icon="pi pi-ban" text rounded size="small" severity="danger" aria-label="Desativar" @click="remove(data)" />
+                <Button v-if="data.active !== false" icon="pi pi-ban" text rounded size="small" severity="warn" aria-label="Bloquear" @click="block(data)" />
+                <Button icon="pi pi-trash" text rounded size="small" severity="danger" aria-label="Apagar" @click="deleteForever(data)" />
               </div>
             </template>
           </Column>

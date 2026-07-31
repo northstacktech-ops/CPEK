@@ -36,7 +36,7 @@ async function loadContact() {
 
   try {
     const response = await api<{ items: ContactRecord[] }>('/api/contacts', {
-      query: { companyId: company.activeId ?? undefined },
+      query: { companyId: company.activeId ?? undefined, includeInactive: true },
     })
     contact.value = response.items.find((item) => item.id === route.params.id) ?? null
   } catch (err) {

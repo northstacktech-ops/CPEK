@@ -11,6 +11,7 @@ interface NamedOption {
   id: string
   label?: string
   name?: string
+  active?: boolean
 }
 
 interface CustomFieldOption {
@@ -91,9 +92,11 @@ const form = ref({
 })
 
 const fallbackStatusOptions = ['Em Aberto', 'Recebido', 'Vencido', 'Cancelado']
-const statusOptions = computed(() => unique([...statuses.value.map(labelOf), ...fallbackStatusOptions]))
-const clienteOptions = computed(() => clients.value.map(labelOf))
-const categoriaOptions = computed(() => categories.value.map(labelOf))
+// Listas completas trazem inativos (pra resolver rótulo de lançamentos antigos
+// via labelOf/optionIdByLabel) — mas cadastro bloqueado não pode virar opção nova.
+const statusOptions = computed(() => unique([...statuses.value.filter((item) => item.active !== false).map(labelOf), ...fallbackStatusOptions]))
+const clienteOptions = computed(() => clients.value.filter((item) => item.active !== false).map(labelOf))
+const categoriaOptions = computed(() => categories.value.filter((item) => item.active !== false).map(labelOf))
 const statusSeverity: Record<string, string> = { Recebido: 'success', Pago: 'success', 'Em Aberto': 'info', Vencido: 'danger', Cancelado: 'secondary' }
 
 const displayFieldOptions = computed(() => customFieldDefs.value.map((f) => ({ value: f.fieldKey, label: f.label })))
@@ -191,10 +194,10 @@ async function loadClosings() {
   try {
     const [currentPeriod, clientRes, categoryRes, statusRes, customFieldRes] = await Promise.all([
       ensure(company.activeId),
-      api<{ items: NamedOption[] }>('/api/contacts', { query: { companyId: company.activeId, type: 'CLIENT' } }),
-      api<{ items: NamedOption[] }>('/api/catalogs', { query: { companyId: company.activeId, kind: 'CATEGORY' } }),
-      api<{ items: NamedOption[] }>('/api/catalogs', { query: { companyId: company.activeId, kind: 'STATUS' } }),
-      api<{ items: CustomFieldOption[] }>('/api/custom-fields', { query: { companyId: company.activeId, kind: 'CLOSING' } }),
+      api<{ items: NamedOption[] }>('/api/contacts', { query: { companyId: company.activeId, type: 'CLIENT', includeInactive: true } }),
+      api<{ items: NamedOption[] }>('/api/catalogs', { query: { companyId: company.activeId, kind: 'CATEGORY', includeInactive: true } }),
+      api<{ items: NamedOption[] }>('/api/catalogs', { query: { companyId: company.activeId, kind: 'STATUS', includeInactive: true } }),
+      api<{ items: CustomFieldOption[] }>('/api/custom-fields', { query: { companyId: company.activeId, kind: 'CLOSING', includeInactive: true } }),
     ])
 
     clients.value = clientRes.items

@@ -1,8 +1,8 @@
 // CPEK — validators de Taxas e Juros (FeeProfile) (ARCHITECTURE §5, §8).
 import { z } from 'zod'
-import { uuid } from './common'
+import { boolQuery, uuid } from './common'
 
-export const listFeeProfilesQuery = z.object({ companyId: uuid })
+export const listFeeProfilesQuery = z.object({ companyId: uuid, includeInactive: boolQuery })
 
 export const createFeeProfileBody = z.object({
   companyId: uuid,

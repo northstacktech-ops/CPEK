@@ -19,7 +19,18 @@ const dashboard = ref<DashboardData | null>(null)
 const reducedMotion = ref(false)
 
 const emptyDashboard = computed<DashboardData>(() => ({
-  cards: { faturamentoBruto: 0, despesas: 0, lucroReal: 0, ticketMedio: 0, vencidos: 0, royalties: null, impostoNf: null, retorno: 0, pesquisa: 0 },
+  cards: {
+    faturamentoBruto: 0,
+    despesas: 0,
+    lucroReal: 0,
+    lucroRealSemDespesas: 0,
+    ticketMedio: 0,
+    vencidos: 0,
+    royalties: null,
+    impostoNf: null,
+    retorno: 0,
+    pesquisa: 0,
+  },
   cashFlow: Array.from({ length: 12 }, (_, index) => ({
     date: `${periodStore.year}-${String(index + 1).padStart(2, '0')}-01`,
     realized: 0,
@@ -64,6 +75,7 @@ const kpis = computed(() => {
 
   return [
     { label: 'Lucro Real', value: cards.lucroReal, reference: `Margem ${margin.toFixed(1)}%`, icon: 'pi pi-chart-line', severity: 'success', featured: true },
+    { label: 'Lucro Real (sem Despesas)', value: cards.lucroRealSemDespesas, reference: 'Sem descontar despesas', icon: 'pi pi-wallet', severity: 'info' },
     { label: 'Faturamento', value: cards.faturamentoBruto, reference: 'Bruto no período', icon: 'pi pi-arrow-up-right', severity: 'info' },
     { label: 'Despesas', value: cards.despesas, reference: 'Saídas registradas', icon: 'pi pi-credit-card', severity: 'danger' },
     { label: 'Ticket Médio', value: cards.ticketMedio, reference: 'por entrada', icon: 'pi pi-shopping-cart', severity: 'secondary' },
@@ -211,7 +223,7 @@ const brl = (value: number) => value.toLocaleString('pt-BR', { style: 'currency'
         {{ error }}
       </Message>
 
-      <div class="col-span-12 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
+      <div class="col-span-12 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
         <div
           v-for="kpi in kpis"
           :key="kpi.label"

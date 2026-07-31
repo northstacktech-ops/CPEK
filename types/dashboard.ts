@@ -3,6 +3,8 @@ export interface DashboardCards {
   faturamentoBruto: number
   despesas: number
   lucroReal: number
+  // Mesma fórmula do lucroReal, sem descontar despesas (pedido do cliente).
+  lucroRealSemDespesas: number
   ticketMedio: number
   // 5º card — default "Vencidos" (D1, §19). TODO(decisão): confirmar vs "A Receber".
   vencidos: number

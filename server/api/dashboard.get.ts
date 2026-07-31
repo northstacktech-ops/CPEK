@@ -2,14 +2,15 @@ import { apiError, requireAuth, validateQuery } from '../utils/http'
 import { withTenant } from '../utils/withTenant'
 import { dashboardQuery } from '../utils/validators/dashboard'
 
-function emptyDashboard(year: number) {
+function emptyDashboard(year: number, vencidos = 0) {
   return {
     cards: {
       faturamentoBruto: 0,
       despesas: 0,
       lucroReal: 0,
+      lucroRealSemDespesas: 0,
       ticketMedio: 0,
-      vencidos: 0,
+      vencidos,
       royalties: null as number | null,
       impostoNf: null as number | null,
       retorno: 0,
@@ -34,16 +35,30 @@ export default defineEventHandler(async (event) => {
 
   try {
     return await withTenant(auth.tenantId, async (tx) => {
-      const period = await tx.period.findUnique({
-        where: { companyId_year_month: { companyId: query.companyId, year, month } },
-      })
+      const today = new Date()
 
-      if (!period) return emptyDashboard(year)
+      // Vencidos nunca depende do período selecionado no dashboard — soma TODOS os
+      // pendentes vencidos da empresa (qualquer mês), não só o mês em exibição.
+      const [period, vencidosExits, vencidosClosings] = await Promise.all([
+        tx.period.findUnique({
+          where: { companyId_year_month: { companyId: query.companyId, year, month } },
+        }),
+        tx.exit.findMany({
+          where: { companyId: query.companyId, dataVencimento: { lt: today }, dataPagamento: null },
+        }),
+        tx.closing.findMany({
+          where: { companyId: query.companyId, dataVencPrev: { lt: today }, dataRecebimento: null },
+        }),
+      ])
+      const vencidos =
+        vencidosExits.reduce((total, item) => total + Number(item.valorDespesa), 0) +
+        vencidosClosings.reduce((total, item) => total + Number(item.valorFechamento), 0)
 
-      const [entries, exits, closings, company] = await Promise.all([
+      if (!period) return emptyDashboard(year, vencidos)
+
+      const [entries, exits, company] = await Promise.all([
         tx.entry.findMany({ where: { companyId: query.companyId, periodId: period.id } }),
         tx.exit.findMany({ where: { companyId: query.companyId, periodId: period.id } }),
-        tx.closing.findMany({ where: { companyId: query.companyId, periodId: period.id } }),
         tx.company.findUnique({
           where: { id: query.companyId },
           select: { royaltiesPercent: true, impostoNfPercent: true },
@@ -73,17 +88,23 @@ export default defineEventHandler(async (event) => {
       const impostoNf = impostoNfPercent != null ? (faturamentoComNf * impostoNfPercent) / 100 : null
       // Lucro real = o que sobra depois de pagar despesas, royalties, imposto, pesquisa e o retorno.
       const lucroReal = faturamentoBruto - despesas - (royalties ?? 0) - (impostoNf ?? 0) - totalRetorno - totalPesquisa
-      const today = new Date()
-      const vencidos =
-        exits
-          .filter((item) => item.dataVencimento && item.dataVencimento < today && !item.dataPagamento)
-          .reduce((total, item) => total + Number(item.valorDespesa), 0) +
-        closings
-          .filter((item) => item.dataVencPrev && item.dataVencPrev < today && !item.dataRecebimento)
-          .reduce((total, item) => total + Number(item.valorFechamento), 0)
+      // Mesmo lucro real, mas sem descontar despesas (pedido do cliente para comparar
+      // o resultado da operação financeira isolado do gasto operacional).
+      const lucroRealSemDespesas = lucroReal + despesas
 
       return {
-        cards: { faturamentoBruto, despesas, lucroReal, ticketMedio, vencidos, royalties, impostoNf, retorno: totalRetorno, pesquisa: totalPesquisa },
+        cards: {
+          faturamentoBruto,
+          despesas,
+          lucroReal,
+          lucroRealSemDespesas,
+          ticketMedio,
+          vencidos,
+          royalties,
+          impostoNf,
+          retorno: totalRetorno,
+          pesquisa: totalPesquisa,
+        },
         cashFlow: emptyFlow.map((point, index) => ({
           ...point,
           realized: index + 1 <= month ? lucroReal : 0,

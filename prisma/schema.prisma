@@ -343,6 +343,9 @@ model Exit {
 
   @@index([tenantId, companyId, periodId])
   @@index([tenantId, companyId, categoryId])
+  // Vencidos no dashboard varre TODOS os períodos da empresa (não só o mês
+  // selecionado) — índice dedicado, sem period_id, pra essa consulta.
+  @@index([tenantId, companyId, dataVencimento])
   @@map("exit")
 }
 
@@ -371,6 +374,9 @@ model Closing {
   company     Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
   @@index([tenantId, companyId, periodId])
+  // Vencidos no dashboard varre TODOS os períodos da empresa (não só o mês
+  // selecionado) — índice dedicado, sem period_id, pra essa consulta.
+  @@index([tenantId, companyId, dataVencPrev])
   @@map("closing")
 }
 

@@ -119,11 +119,14 @@ const form = ref({
 })
 
 const fallbackStatusOptions = ['Em Aberto', 'Pago', 'Vencido', 'Cancelado']
-const statusOptions = computed(() => unique([...statuses.value.map((item) => item.label), ...fallbackStatusOptions]))
-const servicoOptions = computed(() => services.value.map((item) => item.label))
-const categoriaOptions = computed(() => categories.value.map((item) => item.label))
-const pagamentoOptions = computed(() => payments.value.map((item) => item.label))
-const clienteOptions = computed(() => clients.value.map((item) => item.name))
+// As listas completas (services/categories/payments/clients) trazem também
+// inativos — precisam disso pra resolver o rótulo de lançamentos antigos
+// (labelById) — mas um cadastro bloqueado não pode aparecer como opção nova.
+const statusOptions = computed(() => unique([...statuses.value.filter((item) => item.active !== false).map((item) => item.label), ...fallbackStatusOptions]))
+const servicoOptions = computed(() => services.value.filter((item) => item.active !== false).map((item) => item.label))
+const categoriaOptions = computed(() => categories.value.filter((item) => item.active !== false).map((item) => item.label))
+const pagamentoOptions = computed(() => payments.value.filter((item) => item.active !== false).map((item) => item.label))
+const clienteOptions = computed(() => clients.value.filter((item) => item.active !== false).map((item) => item.name))
 
 const displayFieldOptions = computed(() => [
   { value: PLACA_FIELD, label: 'Placa' },
@@ -230,12 +233,12 @@ async function loadEntries() {
   try {
     const [currentPeriod, serviceRes, categoryRes, statusRes, paymentRes, clientRes, customFieldRes] = await Promise.all([
       ensure(company.activeId),
-      api<{ items: CatalogOption[] }>('/api/catalogs', { query: { companyId: company.activeId, kind: 'SERVICE' } }),
-      api<{ items: CatalogOption[] }>('/api/catalogs', { query: { companyId: company.activeId, kind: 'CATEGORY' } }),
-      api<{ items: CatalogOption[] }>('/api/catalogs', { query: { companyId: company.activeId, kind: 'STATUS' } }),
-      api<{ items: CatalogOption[] }>('/api/catalogs', { query: { companyId: company.activeId, kind: 'PAYMENT_METHOD' } }),
-      api<{ items: ContactOption[] }>('/api/contacts', { query: { companyId: company.activeId, type: 'CLIENT' } }),
-      api<{ items: CustomFieldOption[] }>('/api/custom-fields', { query: { companyId: company.activeId, kind: 'ENTRY' } }),
+      api<{ items: CatalogOption[] }>('/api/catalogs', { query: { companyId: company.activeId, kind: 'SERVICE', includeInactive: true } }),
+      api<{ items: CatalogOption[] }>('/api/catalogs', { query: { companyId: company.activeId, kind: 'CATEGORY', includeInactive: true } }),
+      api<{ items: CatalogOption[] }>('/api/catalogs', { query: { companyId: company.activeId, kind: 'STATUS', includeInactive: true } }),
+      api<{ items: CatalogOption[] }>('/api/catalogs', { query: { companyId: company.activeId, kind: 'PAYMENT_METHOD', includeInactive: true } }),
+      api<{ items: ContactOption[] }>('/api/contacts', { query: { companyId: company.activeId, type: 'CLIENT', includeInactive: true } }),
+      api<{ items: CustomFieldOption[] }>('/api/custom-fields', { query: { companyId: company.activeId, kind: 'ENTRY', includeInactive: true } }),
     ])
 
     services.value = serviceRes.items
@@ -401,6 +404,12 @@ function exportCSV() {
   anchor.click()
 }
 
+watch(() => form.value.placa, (value) => {
+  if (!value) return
+  const upper = value.toUpperCase()
+  if (upper !== value) form.value.placa = upper
+})
+
 watch(() => company.activeId, () => {
   void loadEntries()
 })
@@ -454,7 +463,7 @@ onMounted(() => {
           />
         </div>
 
-        <UiTableSkeleton v-if="loading" :rows="6" :columns="8" />
+        <UiTableSkeleton v-if="loading" :rows="6" :columns="9" />
 
         <DataTable
           v-else
@@ -482,6 +491,19 @@ onMounted(() => {
           <Column field="deslocamento" header="Desloc." sortable style="width:8rem">
             <template #body="{ data }">
               <span class="tabular-nums text-surface-500">{{ brl(data.deslocamento) }}</span>
+            </template>
+          </Column>
+          <Column header="Nota Fiscal" style="width:9rem">
+            <template #body="{ data }">
+              <div class="flex flex-col gap-0.5">
+                <Tag
+                  :value="data.raw.notaFiscal ? 'Emitida' : 'Sem NF'"
+                  :severity="data.raw.notaFiscal ? 'success' : 'secondary'"
+                />
+                <span v-if="data.raw.notaFiscal && data.raw.documentoNf?.trim()" class="text-xs text-surface-400">
+                  {{ data.raw.documentoNf }}
+                </span>
+              </div>
             </template>
           </Column>
           <Column :header="displayFieldLabel" style="width:9rem">

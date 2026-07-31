@@ -7,6 +7,10 @@
 // Agendado (previsto): soma pela data de competência/vencimento, independente
 // de já ter sido liquidado ou não.
 //
+// Fechamento não entra na receita (nem em nenhuma outra linha) — mesma regra
+// já aplicada ao Dashboard: Fechamento só conta em Vencidos, que não existe
+// no DRE. Receita aqui é só Entry.valorServico + deslocamento.
+//
 // Despesas são separadas em Fixas/Variáveis pelo CostCenter.costType do
 // centro de custo do lançamento; sem centro de custo cai em "Outras despesas"
 // (Variável, pra não sumir do total).
@@ -69,10 +73,9 @@ export async function buildDre(
 ): Promise<DreReport> {
   const { companyId, year, mode } = params
 
-  const [entries, exits, closings, services, costCenters] = await Promise.all([
+  const [entries, exits, services, costCenters] = await Promise.all([
     tx.entry.findMany({ where: { companyId } }),
     tx.exit.findMany({ where: { companyId } }),
-    tx.closing.findMany({ where: { companyId } }),
     tx.catalogValue.findMany({ where: { companyId, kind: 'SERVICE' } }),
     tx.costCenter.findMany({ where: { companyId } }),
   ])
@@ -91,13 +94,6 @@ export async function buildDre(
     revenueTotal[month] += amount
     const key = entry.serviceId ?? '__sem_servico__'
     addTo(revenueByService, key, entry.serviceId ? (serviceLabel.get(entry.serviceId) ?? 'Sem serviço') : 'Sem serviço', month, amount)
-  }
-
-  for (const closing of closings) {
-    const date = mode === 'realizado' ? closing.dataRecebimento : (closing.dataVencPrev ?? closing.createdAt)
-    const month = monthIndex(date, year)
-    if (month === null) continue
-    revenueTotal[month] += Number(closing.valorFechamento)
   }
 
   const fixedTotal = emptyMonths()

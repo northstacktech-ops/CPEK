@@ -1,12 +1,20 @@
 // CPEK — guarda de rota no client (ARCHITECTURE §9). Redireciona não autenticado
 // para /login. A autoridade de segurança é o servidor; isto é só UX.
-export default defineNuxtRouteMiddleware((to) => {
+import { useAuth } from '../composables/useAuth'
+
+export default defineNuxtRouteMiddleware(async (to) => {
   if (import.meta.server) return
 
   const session = useSessionStore()
   const PUBLIC_PATHS = ['/login', '/definir-senha']
   const isPublic = PUBLIC_PATHS.includes(to.path)
 
+  if (!session.isAuthenticated && !isPublic) {
+    // Rede de segurança contra timing entre o plugin de bootstrap e a navegação
+    // inicial — tenta restaurar a sessão do Supabase antes de desistir e mandar
+    // pro /login (o plugin já faz isso no boot; isto cobre qualquer corrida).
+    await useAuth().restoreSession()
+  }
   if (!session.isAuthenticated && !isPublic) {
     return navigateTo('/login')
   }

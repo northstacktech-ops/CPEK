@@ -15,6 +15,51 @@ export function useSupabase(): SupabaseClient {
   return _client
 }
 
+/**
+ * Aplica ao Pinia (session + company) uma sessão do Supabase (login, restore
+ * ou refresh automático de token) — lógica única reaproveitada por signIn,
+ * restoreSession e o listener onAuthStateChange, pra não triplicar o parsing
+ * de app_metadata em três lugares.
+ */
+export async function applySupabaseSession(
+  supaSession: { access_token: string; user: { id: string; email?: string; app_metadata?: unknown } } | null,
+): Promise<boolean> {
+  const session = useSessionStore()
+  const company = useCompanyStore()
+
+  if (!supaSession) {
+    session.clear()
+    return false
+  }
+
+  const token = supaSession.access_token
+  const user = supaSession.user
+  const meta = (user.app_metadata ?? {}) as { account_id?: string; role?: string }
+  if (!token || !meta.account_id) {
+    session.clear()
+    return false
+  }
+
+  session.set({
+    user: { id: user.id, email: user.email, role: meta.role === 'ADMIN' ? 'ADMIN' : 'MEMBER' },
+    accessToken: token,
+    tenantId: meta.account_id,
+  })
+
+  try {
+    const me = await $fetch<{
+      companies: Array<{ id: string; name: string; segment?: string | null }>
+    }>('/api/me', {
+      headers: { authorization: `Bearer ${token}` },
+    })
+    company.setCompanies(me.companies)
+  } catch {
+    // Sessão existe no client mas o servidor recusou (ex.: revogada) —
+    // segue autenticado sem empresas; as telas tratam a lista vazia.
+  }
+  return true
+}
+
 export function useAuth() {
   const session = useSessionStore()
   const company = useCompanyStore()
@@ -23,29 +68,16 @@ export function useAuth() {
   async function signIn(email: string, password: string) {
     const { data, error } = await useSupabase().auth.signInWithPassword({ email, password })
     if (error) throw error
-    const token = data.session?.access_token
-    const meta = (data.user?.app_metadata ?? {}) as { account_id?: string; role?: string }
-    if (!token || !data.user) {
+    if (!data.session || !data.user) {
       throw new Error('Não foi possível iniciar a sessão. Tente novamente.')
     }
+    const meta = (data.user.app_metadata ?? {}) as { account_id?: string }
     if (!meta.account_id) {
       // Sem account_id não há tenant: deixar a sessão vazia faria o middleware
       // global mandar de volta pro /login sem nenhuma explicação visível.
       throw new Error('Esta conta ainda não está vinculada a nenhuma empresa. Fale com o administrador.')
     }
-
-    session.set({
-      user: { id: data.user.id, email: data.user.email, role: meta.role === 'ADMIN' ? 'ADMIN' : 'MEMBER' },
-      accessToken: token,
-      tenantId: meta.account_id,
-    })
-
-    const me = await $fetch<{
-      companies: Array<{ id: string; name: string; segment?: string | null }>
-    }>('/api/me', {
-      headers: { authorization: `Bearer ${token}` },
-    })
-    company.setCompanies(me.companies)
+    await applySupabaseSession(data.session)
   }
 
   async function signOut() {
@@ -64,29 +96,7 @@ export function useAuth() {
    */
   async function restoreSession(): Promise<boolean> {
     const { data } = await useSupabase().auth.getSession()
-    const token = data.session?.access_token
-    const user = data.session?.user
-    const meta = (user?.app_metadata ?? {}) as { account_id?: string; role?: string }
-    if (!token || !user || !meta.account_id) return false
-
-    session.set({
-      user: { id: user.id, email: user.email, role: meta.role === 'ADMIN' ? 'ADMIN' : 'MEMBER' },
-      accessToken: token,
-      tenantId: meta.account_id,
-    })
-
-    try {
-      const me = await $fetch<{
-        companies: Array<{ id: string; name: string; segment?: string | null }>
-      }>('/api/me', {
-        headers: { authorization: `Bearer ${token}` },
-      })
-      company.setCompanies(me.companies)
-    } catch {
-      // Sessão existe no client mas o servidor recusou (ex.: revogada) —
-      // segue autenticado sem empresas; as telas tratam a lista vazia.
-    }
-    return true
+    return applySupabaseSession(data.session)
   }
 
   return { signIn, signOut, restoreSession }

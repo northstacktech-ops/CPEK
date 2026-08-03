@@ -74,6 +74,8 @@ const error = ref<string | null>(null)
 const search = ref('')
 const statusFilter = ref<string | null>(null)
 const centroCustoFilter = ref<string | null>(null)
+const notaFiscalFilter = ref<string | null>(null)
+const notaFiscalOptions = ['Com nota fiscal', 'Sem nota fiscal']
 const drawerOpen = ref(false)
 const editingId = ref<string | null>(null)
 
@@ -82,6 +84,7 @@ const categories = ref<NamedOption[]>([])
 const suppliers = ref<NamedOption[]>([])
 const costCenters = ref<NamedOption[]>([])
 const payments = ref<NamedOption[]>([])
+const statuses = ref<NamedOption[]>([])
 const customFieldDefs = ref<CustomFieldOption[]>([])
 const displayField = ref<string | null>(null)
 
@@ -102,9 +105,9 @@ const form = ref({
   custom: {} as Record<string, unknown>,
 })
 
-const statusOptions = ['Em Aberto', 'Pago', 'Vencido', 'Cancelado']
 // Listas completas trazem inativos (pra resolver rótulo de lançamentos antigos
 // via labelOf/labelById) — mas cadastro bloqueado não pode virar opção nova.
+const statusOptions = computed(() => statuses.value.filter((item) => item.active !== false).map(labelOf))
 const categoriaOptions = computed(() => categories.value.filter((item) => item.active !== false).map(labelOf))
 const fornecedorOptions = computed(() => suppliers.value.filter((item) => item.active !== false).map(labelOf))
 const centroCustoOptions = computed(() => costCenters.value.filter((item) => item.active !== false).map(labelOf))
@@ -118,11 +121,16 @@ const filtered = computed(() => {
   let result = exits.value
   if (statusFilter.value) result = result.filter((exit) => exit.status === statusFilter.value)
   if (centroCustoFilter.value) result = result.filter((exit) => exit.centroCusto === centroCustoFilter.value)
+  if (notaFiscalFilter.value) {
+    const wantsNf = notaFiscalFilter.value === 'Com nota fiscal'
+    result = result.filter((exit) => Boolean(exit.raw.documentoNf) === wantsNf)
+  }
   const q = search.value.trim().toLowerCase()
   if (q) {
-    result = result.filter((exit) =>
-      `${exit.fornecedor} ${exit.categoria} ${exit.status} ${customColumnValue(exit.raw)}`.toLowerCase().includes(q),
-    )
+    result = result.filter((exit) => {
+      const nfText = exit.raw.documentoNf ? `com nota fiscal nf ${exit.raw.documentoNf}` : 'sem nota fiscal nf'
+      return `${exit.fornecedor} ${exit.categoria} ${exit.status} ${customColumnValue(exit.raw)} ${nfText}`.toLowerCase().includes(q)
+    })
   }
   return result
 })
@@ -197,12 +205,13 @@ async function loadExits() {
   error.value = null
 
   try {
-    const [currentPeriod, categoryRes, supplierRes, costCenterRes, paymentRes, customFieldRes] = await Promise.all([
+    const [currentPeriod, categoryRes, supplierRes, costCenterRes, paymentRes, statusRes, customFieldRes] = await Promise.all([
       ensure(company.activeId),
       api<{ items: NamedOption[] }>('/api/catalogs', { query: { companyId: company.activeId, kind: 'CATEGORY', includeInactive: true } }),
       api<{ items: NamedOption[] }>('/api/contacts', { query: { companyId: company.activeId, type: 'SUPPLIER', includeInactive: true } }),
       api<{ items: NamedOption[] }>('/api/cost-centers', { query: { companyId: company.activeId, includeInactive: true } }),
       api<{ items: NamedOption[] }>('/api/catalogs', { query: { companyId: company.activeId, kind: 'PAYMENT_METHOD', includeInactive: true } }),
+      api<{ items: NamedOption[] }>('/api/catalogs', { query: { companyId: company.activeId, kind: 'STATUS', includeInactive: true } }),
       api<{ items: CustomFieldOption[] }>('/api/custom-fields', { query: { companyId: company.activeId, kind: 'EXIT', includeInactive: true } }),
     ])
 
@@ -210,6 +219,7 @@ async function loadExits() {
     suppliers.value = supplierRes.items
     costCenters.value = costCenterRes.items
     payments.value = paymentRes.items
+    statuses.value = statusRes.items
     customFieldDefs.value = customFieldRes.items.filter((f) => f.active !== false)
     if (!displayField.value && customFieldDefs.value.length) displayField.value = customFieldDefs.value[0].fieldKey
 
@@ -397,6 +407,7 @@ onMounted(() => {
           </IconField>
           <Select v-model="centroCustoFilter" :options="centroCustoOptions" placeholder="C. Custo" show-clear size="small" class="w-full md:w-40" />
           <Select v-model="statusFilter" :options="statusOptions" placeholder="Status" show-clear size="small" class="w-full md:w-40" />
+          <Select v-model="notaFiscalFilter" :options="notaFiscalOptions" placeholder="Nota fiscal" show-clear size="small" class="w-full md:w-44" />
           <Select
             v-model="displayField"
             :options="displayFieldOptions"
@@ -423,6 +434,19 @@ onMounted(() => {
             <template #body="{ data }"><span class="font-semibold tabular-nums text-red-600">{{ brl(data.valor) }}</span></template>
           </Column>
           <Column field="vencimento" header="Vencimento" sortable style="width:9rem" />
+          <Column header="Nota Fiscal" style="width:9rem">
+            <template #body="{ data }">
+              <div class="flex flex-col gap-0.5">
+                <Tag
+                  :value="data.raw.documentoNf ? 'Emitida' : 'Sem NF'"
+                  :severity="data.raw.documentoNf ? 'success' : 'secondary'"
+                />
+                <span v-if="data.raw.documentoNf?.trim()" class="text-xs text-surface-400">
+                  {{ data.raw.documentoNf }}
+                </span>
+              </div>
+            </template>
+          </Column>
           <Column v-if="displayField" :header="displayFieldLabel" style="width:9rem">
             <template #body="{ data }">
               <span class="text-sm text-surface-600 dark:text-surface-300">{{ customColumnValue(data.raw) }}</span>

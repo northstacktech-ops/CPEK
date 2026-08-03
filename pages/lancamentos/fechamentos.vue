@@ -91,10 +91,9 @@ const form = ref({
   custom: {} as Record<string, unknown>,
 })
 
-const fallbackStatusOptions = ['Em Aberto', 'Recebido', 'Vencido', 'Cancelado']
 // Listas completas trazem inativos (pra resolver rótulo de lançamentos antigos
 // via labelOf/optionIdByLabel) — mas cadastro bloqueado não pode virar opção nova.
-const statusOptions = computed(() => unique([...statuses.value.filter((item) => item.active !== false).map(labelOf), ...fallbackStatusOptions]))
+const statusOptions = computed(() => statuses.value.filter((item) => item.active !== false).map(labelOf))
 const clienteOptions = computed(() => clients.value.filter((item) => item.active !== false).map(labelOf))
 const categoriaOptions = computed(() => categories.value.filter((item) => item.active !== false).map(labelOf))
 const statusSeverity: Record<string, string> = { Recebido: 'success', Pago: 'success', 'Em Aberto': 'info', Vencido: 'danger', Cancelado: 'secondary' }
@@ -118,10 +117,6 @@ const filtered = computed(() => {
   }
   return result
 })
-
-function unique(values: string[]) {
-  return [...new Set(values.filter(Boolean))]
-}
 
 function labelOf(item: NamedOption) {
   return item.label ?? item.name ?? ''
@@ -403,6 +398,19 @@ onMounted(() => {
               <span :class="data.recebimento ? 'text-surface-700 dark:text-surface-200' : 'text-surface-400'">
                 {{ data.recebimento || '-' }}
               </span>
+            </template>
+          </Column>
+          <Column header="Nota Fiscal" style="width:9rem">
+            <template #body="{ data }">
+              <div class="flex flex-col gap-0.5">
+                <Tag
+                  :value="data.raw.documentoNf ? 'Emitida' : 'Sem NF'"
+                  :severity="data.raw.documentoNf ? 'success' : 'secondary'"
+                />
+                <span v-if="data.raw.documentoNf?.trim()" class="text-xs text-surface-400">
+                  {{ data.raw.documentoNf }}
+                </span>
+              </div>
             </template>
           </Column>
           <Column v-if="displayField" :header="displayFieldLabel" style="width:9rem">

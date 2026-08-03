@@ -118,11 +118,10 @@ const form = ref({
   custom: {} as Record<string, unknown>,
 })
 
-const fallbackStatusOptions = ['Em Aberto', 'Pago', 'Vencido', 'Cancelado']
 // As listas completas (services/categories/payments/clients) trazem também
 // inativos — precisam disso pra resolver o rótulo de lançamentos antigos
 // (labelById) — mas um cadastro bloqueado não pode aparecer como opção nova.
-const statusOptions = computed(() => unique([...statuses.value.filter((item) => item.active !== false).map((item) => item.label), ...fallbackStatusOptions]))
+const statusOptions = computed(() => statuses.value.filter((item) => item.active !== false).map((item) => item.label))
 const servicoOptions = computed(() => services.value.filter((item) => item.active !== false).map((item) => item.label))
 const categoriaOptions = computed(() => categories.value.filter((item) => item.active !== false).map((item) => item.label))
 const pagamentoOptions = computed(() => payments.value.filter((item) => item.active !== false).map((item) => item.label))
@@ -158,10 +157,6 @@ const filtered = computed(() => {
   }
   return result
 })
-
-function unique(values: string[]) {
-  return [...new Set(values.filter(Boolean))]
-}
 
 function brl(value: number) {
   return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })

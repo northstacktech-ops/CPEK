@@ -37,6 +37,15 @@ export default defineEventHandler(async (event) => {
     return await withTenant(auth.tenantId, async (tx) => {
       const today = new Date()
 
+      // Status marcado como "não conta no Dashboard" (ex.: Consolidado) — o
+      // lançamento some de toda conta aqui, aparecendo só somado no DRE.
+      const excludedStatuses = await tx.catalogValue.findMany({
+        where: { companyId: query.companyId, kind: 'STATUS', excludeFromDashboard: true },
+        select: { id: true },
+      })
+      const excludedStatusIds = excludedStatuses.map((s) => s.id)
+      const statusFilter = excludedStatusIds.length ? { statusId: { notIn: excludedStatusIds } } : {}
+
       // Vencidos nunca depende do período selecionado no dashboard — soma TODOS os
       // pendentes vencidos da empresa (qualquer mês), não só o mês em exibição.
       const [period, vencidosExits, vencidosClosings] = await Promise.all([
@@ -44,10 +53,10 @@ export default defineEventHandler(async (event) => {
           where: { companyId_year_month: { companyId: query.companyId, year, month } },
         }),
         tx.exit.findMany({
-          where: { companyId: query.companyId, dataVencimento: { lt: today }, dataPagamento: null },
+          where: { companyId: query.companyId, dataVencimento: { lt: today }, dataPagamento: null, ...statusFilter },
         }),
         tx.closing.findMany({
-          where: { companyId: query.companyId, dataVencPrev: { lt: today }, dataRecebimento: null },
+          where: { companyId: query.companyId, dataVencPrev: { lt: today }, dataRecebimento: null, ...statusFilter },
         }),
       ])
       const vencidos =
@@ -57,8 +66,8 @@ export default defineEventHandler(async (event) => {
       if (!period) return emptyDashboard(year, vencidos)
 
       const [entries, exits, company] = await Promise.all([
-        tx.entry.findMany({ where: { companyId: query.companyId, periodId: period.id } }),
-        tx.exit.findMany({ where: { companyId: query.companyId, periodId: period.id } }),
+        tx.entry.findMany({ where: { companyId: query.companyId, periodId: period.id, ...statusFilter } }),
+        tx.exit.findMany({ where: { companyId: query.companyId, periodId: period.id, ...statusFilter } }),
         tx.company.findUnique({
           where: { id: query.companyId },
           select: { royaltiesPercent: true, impostoNfPercent: true },

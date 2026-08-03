@@ -26,16 +26,23 @@ export const createCatalogBody = z
     label: z.string().min(1).max(120),
     order: z.number().int().default(0),
     dreGroup: dreGroup.optional(),
+    excludeFromDashboard: z.boolean().optional(),
   })
   // dreGroup só faz sentido para CATEGORY (§5.1).
   .refine((v) => v.kind === 'CATEGORY' || v.dreGroup == null, {
     message: 'dreGroup só é válido para kind=CATEGORY',
     path: ['dreGroup'],
   })
+  // excludeFromDashboard só faz sentido para STATUS (ex.: "Consolidado").
+  .refine((v) => v.kind === 'STATUS' || v.excludeFromDashboard == null, {
+    message: 'excludeFromDashboard só é válido para kind=STATUS',
+    path: ['excludeFromDashboard'],
+  })
 
 export const updateCatalogBody = z.object({
   label: z.string().min(1).max(120).optional(),
   order: z.number().int().optional(),
   dreGroup: dreGroup.optional(),
+  excludeFromDashboard: z.boolean().optional(),
   active: z.boolean().optional(),
 })

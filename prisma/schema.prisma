@@ -173,6 +173,11 @@ model CatalogValue {
   // Apenas para kind = CATEGORY: a qual linha do DRE esta categoria pertence.
   dreGroup DreGroup? @map("dre_group")
 
+  // Apenas para kind = STATUS: lançamento com esse status some de todo cálculo
+  // do Dashboard (faturamento/despesas/royalties/imposto/vencidos/etc.) e passa
+  // a aparecer só somado no DRE. Usado pelo status "Consolidado".
+  excludeFromDashboard Boolean @default(false) @map("exclude_from_dashboard")
+
   company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
   @@index([tenantId, companyId, kind])
@@ -324,6 +329,7 @@ model Exit {
   costCenterId  String? @map("cost_center_id") @db.Uuid
   categoryId    String? @map("category_id") @db.Uuid
   paymentId     String? @map("payment_id") @db.Uuid
+  statusId      String? @map("status_id") @db.Uuid
 
   valorDespesa   Decimal   @map("valor_despesa") @db.Decimal(14, 2)
   descricao      String?

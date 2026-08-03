@@ -13,6 +13,7 @@ interface CatalogItem {
   order?: number
   active?: boolean
   dreGroup?: string | null
+  excludeFromDashboard?: boolean
 }
 
 const props = defineProps<{
@@ -20,6 +21,7 @@ const props = defineProps<{
   kind: CatalogKind
   newLabel: string
   showDreGroup?: boolean
+  showDashboardExclude?: boolean
 }>()
 
 const company = useCompanyStore()
@@ -32,7 +34,7 @@ const dialogOpen = ref(false)
 const editingId = ref<string | null>(null)
 const items = ref<CatalogItem[]>([])
 const showInactive = ref(false)
-const form = ref({ label: '', order: 0, dreGroup: 'OPERATING_REVENUE', active: true })
+const form = ref({ label: '', order: 0, dreGroup: 'OPERATING_REVENUE', active: true, excludeFromDashboard: false })
 
 const dreGroupOptions = [
   { label: 'Receita operacional', value: 'OPERATING_REVENUE' },
@@ -70,7 +72,7 @@ async function loadItems() {
 
 function openNew() {
   editingId.value = null
-  form.value = { label: '', order: items.value.length + 1, dreGroup: 'OPERATING_REVENUE', active: true }
+  form.value = { label: '', order: items.value.length + 1, dreGroup: 'OPERATING_REVENUE', active: true, excludeFromDashboard: false }
   dialogOpen.value = true
 }
 
@@ -81,6 +83,7 @@ function openEdit(item: CatalogItem) {
     order: item.order ?? 0,
     dreGroup: item.dreGroup ?? 'OPERATING_REVENUE',
     active: item.active !== false,
+    excludeFromDashboard: item.excludeFromDashboard === true,
   }
   dialogOpen.value = true
 }
@@ -100,6 +103,7 @@ async function save() {
       order: form.value.order,
       active: form.value.active,
       ...(props.showDreGroup ? { dreGroup: form.value.dreGroup } : {}),
+      ...(props.showDashboardExclude ? { excludeFromDashboard: form.value.excludeFromDashboard } : {}),
     }
     const response = editingId.value
       ? await api<{ item: CatalogItem }>(`/api/catalogs/${editingId.value}`, { method: 'PATCH', body })
@@ -186,6 +190,17 @@ onMounted(() => {
             <template #body="{ data }">{{ dreGroupLabel(data.dreGroup) }}</template>
           </Column>
           <Column field="order" header="Ordem" sortable style="width:7rem" />
+          <Column v-if="showDashboardExclude" header="Dashboard" style="width:10rem">
+            <template #body="{ data }">
+              <Tag
+                v-if="data.excludeFromDashboard"
+                value="Só no DRE"
+                severity="secondary"
+                :title="'Não entra em nenhuma conta do Dashboard, aparece só somado no DRE'"
+              />
+              <span v-else class="text-xs text-surface-400">Normal</span>
+            </template>
+          </Column>
           <Column field="active" header="Status" style="width:8rem">
             <template #body="{ data }">
               <Tag :value="data.active === false ? 'Inativo' : 'Ativo'" :severity="data.active === false ? 'secondary' : 'success'" />
@@ -221,6 +236,10 @@ onMounted(() => {
         <div class="flex flex-col gap-1.5">
           <label class="text-xs font-semibold uppercase tracking-wide text-surface-500">Ordem</label>
           <InputNumber v-model="form.order" :min="0" fluid />
+        </div>
+        <div v-if="showDashboardExclude" class="flex items-center gap-2">
+          <ToggleSwitch v-model="form.excludeFromDashboard" input-id="catalog-exclude-dashboard" />
+          <label for="catalog-exclude-dashboard" class="text-sm">Não contar no Dashboard (aparece só somado no DRE)</label>
         </div>
         <div class="flex items-center gap-2">
           <ToggleSwitch v-model="form.active" input-id="catalog-active" />

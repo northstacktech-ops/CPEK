@@ -17,6 +17,7 @@ export default defineEventHandler(async (event) => {
         label: body.label,
         order: body.order,
         dreGroup: body.dreGroup,
+        excludeFromDashboard: body.excludeFromDashboard,
       },
     })
     return { item }

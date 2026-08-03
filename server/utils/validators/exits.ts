@@ -17,6 +17,7 @@ export const createExitBody = z.object({
   costCenterId: uuid.nullable().optional(),
   categoryId: uuid.nullable().optional(),
   paymentId: uuid.nullable().optional(),
+  statusId: uuid.nullable().optional(),
   valorDespesa: money,
   descricao: z.string().max(2000).nullable().optional(),
   dataLancamento: z.coerce.date().optional(),

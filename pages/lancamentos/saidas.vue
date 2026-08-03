@@ -48,6 +48,7 @@ interface ExitRecord {
   categoryId?: string | null
   costCenterId?: string | null
   paymentId?: string | null
+  statusId?: string | null
   customSnapshot?: unknown
 }
 
@@ -179,7 +180,8 @@ function formatDate(value: Date | string | null | undefined) {
 }
 
 function statusFromExit(exit: ExitRecord) {
-  if (exit.status) return exit.status
+  const persisted = labelById(statuses.value, exit.statusId)
+  if (persisted) return persisted
   if (exit.dataPagamento) return 'Pago'
   if (exit.dataVencimento && new Date(exit.dataVencimento) < new Date()) return 'Vencido'
   return 'Em Aberto'
@@ -298,6 +300,7 @@ async function save() {
       costCenterId: optionIdByLabel(costCenters.value, form.value.centroCusto),
       categoryId: optionIdByLabel(categories.value, form.value.categoria),
       paymentId: optionIdByLabel(payments.value, form.value.formaPagamento),
+      statusId: optionIdByLabel(statuses.value, form.value.status),
       valorDespesa: form.value.valor ?? 0,
       // null (não undefined) quando o campo foi limpo: undefined = "não mexer" no PATCH,
       // e ficaria com o valor antigo preso no banco em vez de apagar de verdade.
@@ -355,8 +358,39 @@ async function deleteExit(id: string) {
 }
 
 function exportCSV() {
-  const rows = [['Data', 'Fornecedor', 'Categoria', 'C. Custo', 'Valor', 'Vencimento', 'Status']]
-  filtered.value.forEach((exit) => rows.push([exit.data, exit.fornecedor, exit.categoria, exit.centroCusto, String(exit.valor), exit.vencimento, exit.status]))
+  const headers = [
+    'Data de competência', 'Vencimento', 'Data de pagamento', 'Fornecedor', 'Categoria', 'Centro de custo',
+    'Forma de pagamento', 'Valor da despesa', 'Nota fiscal', 'Documento NF', 'Status', 'Descrição', 'Anotações',
+    ...customFieldDefs.value.map((f) => f.label),
+  ]
+  const rows: string[][] = [headers]
+  filtered.value.forEach((exit) => {
+    const raw = exit.raw
+    const snapshot = Array.isArray(raw.customSnapshot) ? (raw.customSnapshot as CustomSnapshotItem[]) : []
+    const customValues = customFieldDefs.value.map((f) => {
+      const item = snapshot.find((s) => s.fieldKey === f.fieldKey)
+      if (!item || item.value == null || item.value === '') return ''
+      if (item._type === 'CURRENCY') return brl(Number(item.value))
+      if (item._type === 'DATE') return formatDate(item.value as string)
+      return String(item.value)
+    })
+    rows.push([
+      formatDate(raw.dataLancamento),
+      formatDate(raw.dataVencimento),
+      formatDate(raw.dataPagamento),
+      exit.fornecedor,
+      exit.categoria,
+      exit.centroCusto,
+      labelById(payments.value, raw.paymentId) || '-',
+      brl(Number(raw.valorDespesa ?? exit.valor ?? 0)),
+      raw.documentoNf ? 'Sim' : 'Não',
+      raw.documentoNf ?? '',
+      exit.status,
+      raw.descricao ?? '',
+      raw.anotacoes ?? '',
+      ...customValues,
+    ])
+  })
   // Excel pt-BR: separador ';', BOM UTF-8 e CRLF (senão abre tudo numa coluna).
   const csv = '﻿' + rows.map((row) => row.map((cell) => `"${cell.replaceAll('"', '""')}"`).join(';')).join('\r\n')
   const anchor = document.createElement('a')

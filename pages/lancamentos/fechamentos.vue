@@ -163,7 +163,8 @@ function formatDate(value: Date | string | null | undefined) {
 }
 
 function statusFromClosing(closing: ClosingRecord) {
-  if (closing.status) return closing.status
+  const persisted = labelById(statuses.value, closing.statusId)
+  if (persisted) return persisted
   if (closing.dataRecebimento) return 'Recebido'
   if (closing.dataVencPrev && new Date(closing.dataVencPrev) < new Date()) return 'Vencido'
   return 'Em Aberto'
@@ -322,8 +323,36 @@ async function deleteClosing(id: string) {
 }
 
 function exportCSV() {
-  const rows = [['Cliente', 'Valor', 'Vencimento', 'Recebimento', 'Status']]
-  filtered.value.forEach((closing) => rows.push([closing.cliente, String(closing.valor), closing.vencimento, closing.recebimento, closing.status]))
+  const headers = [
+    'Data do fechamento', 'Vencimento previsto', 'Data de recebimento', 'Cliente', 'Categoria',
+    'Valor do fechamento', 'Nota fiscal', 'Documento NF', 'Status', 'Descrição',
+    ...customFieldDefs.value.map((f) => f.label),
+  ]
+  const rows: string[][] = [headers]
+  filtered.value.forEach((closing) => {
+    const raw = closing.raw
+    const snapshot = Array.isArray(raw.customSnapshot) ? (raw.customSnapshot as CustomSnapshotItem[]) : []
+    const customValues = customFieldDefs.value.map((f) => {
+      const item = snapshot.find((s) => s.fieldKey === f.fieldKey)
+      if (!item || item.value == null || item.value === '') return ''
+      if (item._type === 'CURRENCY') return brl(Number(item.value))
+      if (item._type === 'DATE') return formatDate(item.value as string)
+      return String(item.value)
+    })
+    rows.push([
+      formatDate(raw.dataFechamento),
+      formatDate(raw.dataVencPrev),
+      formatDate(raw.dataRecebimento),
+      closing.cliente,
+      labelById(categories.value, raw.categoryId) || '-',
+      brl(Number(raw.valorFechamento ?? closing.valor ?? 0)),
+      raw.documentoNf ? 'Sim' : 'Não',
+      raw.documentoNf ?? '',
+      closing.status,
+      raw.descricao ?? '',
+      ...customValues,
+    ])
+  })
   // Excel pt-BR: separador ';', BOM UTF-8 e CRLF (senão abre tudo numa coluna).
   const csv = '﻿' + rows.map((row) => row.map((cell) => `"${cell.replaceAll('"', '""')}"`).join(';')).join('\r\n')
   const anchor = document.createElement('a')

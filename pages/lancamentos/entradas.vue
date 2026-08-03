@@ -201,7 +201,8 @@ function customSnapshotToRecord(snapshot: unknown): Record<string, unknown> {
 }
 
 function statusFromEntry(entry: EntryRecord) {
-  if (entry.status) return entry.status
+  const persisted = labelById(statuses.value, entry.statusId)
+  if (persisted) return persisted
   if (entry.dataPagamento) return 'Pago'
   if (entry.dataServico && new Date(entry.dataServico) < new Date()) return 'Vencido'
   return 'Em Aberto'
@@ -389,8 +390,43 @@ async function deleteEntry(id: string) {
 }
 
 function exportCSV() {
-  const rows = [['Data', 'Cliente', 'Serviço', 'Valor', 'Deslocamento', 'Status']]
-  filtered.value.forEach((entry) => rows.push([entry.data, entry.cliente, entry.servico, String(entry.valor), String(entry.deslocamento), entry.status]))
+  const headers = [
+    'Data de competência', 'Data de pagamento', 'Cliente', 'Serviço', 'Categoria', 'Forma de pagamento',
+    'Valor do serviço', 'Deslocamento', 'Pesquisa', 'Retorno', 'Nota fiscal', 'Documento NF',
+    'Placa', 'Modelo', 'Status', 'Descrição',
+    ...customFieldDefs.value.map((f) => f.label),
+  ]
+  const rows: string[][] = [headers]
+  filtered.value.forEach((entry) => {
+    const raw = entry.raw
+    const snapshot = Array.isArray(raw.customSnapshot) ? (raw.customSnapshot as CustomSnapshotItem[]) : []
+    const customValues = customFieldDefs.value.map((f) => {
+      const item = snapshot.find((s) => s.fieldKey === f.fieldKey)
+      if (!item || item.value == null || item.value === '') return ''
+      if (item._type === 'CURRENCY') return brl(Number(item.value))
+      if (item._type === 'DATE') return formatDate(item.value as string)
+      return String(item.value)
+    })
+    rows.push([
+      formatDate(raw.dataServico),
+      formatDate(raw.dataPagamento),
+      entry.cliente,
+      entry.servico,
+      labelById(categories.value, raw.categoryId) || '-',
+      labelById(payments.value, raw.paymentId) || '-',
+      brl(Number(raw.valorServico ?? entry.valor ?? 0)),
+      brl(Number(raw.deslocamento ?? entry.deslocamento ?? 0)),
+      raw.pesquisa != null ? brl(Number(raw.pesquisa)) : '',
+      raw.retorno != null ? brl(Number(raw.retorno)) : '',
+      raw.notaFiscal ? 'Sim' : 'Não',
+      raw.documentoNf ?? '',
+      raw.placa ?? '',
+      raw.modelo ?? '',
+      entry.status,
+      raw.anotacoes ?? '',
+      ...customValues,
+    ])
+  })
   // Excel pt-BR: separador ';', BOM UTF-8 e CRLF (senão abre tudo numa coluna).
   const csv = '﻿' + rows.map((row) => row.map((cell) => `"${cell.replaceAll('"', '""')}"`).join(';')).join('\r\n')
   const anchor = document.createElement('a')

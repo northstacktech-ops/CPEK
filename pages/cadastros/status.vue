@@ -3,5 +3,5 @@ import CatalogCrudPage from '../../components/cadastros/CatalogCrudPage.vue'
 </script>
 
 <template>
-  <CatalogCrudPage title="Status" kind="STATUS" new-label="Novo status" />
+  <CatalogCrudPage title="Status" kind="STATUS" new-label="Novo status" show-dashboard-exclude />
 </template>

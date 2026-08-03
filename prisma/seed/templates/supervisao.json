@@ -12,8 +12,8 @@
     "STATUS": [
       { "label": "Em Aberto", "order": 1 },
       { "label": "Pago", "order": 2 },
-      { "label": "Vencido", "order": 3 },
-      { "label": "Cancelado", "order": 4 }
+      { "label": "Cancelado", "order": 3 },
+      { "label": "Consolidado", "order": 4, "excludeFromDashboard": true }
     ],
     "PAYMENT_METHOD": [
       { "label": "Dinheiro", "order": 1 },

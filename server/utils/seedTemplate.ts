@@ -14,7 +14,7 @@ export interface FranchiseTemplate {
   templateKey: string
   companyName: string
   segment: string
-  catalogs: Partial<Record<CatalogKind, Array<{ label: string; order?: number; dreGroup?: DreGroup }>>>
+  catalogs: Partial<Record<CatalogKind, Array<{ label: string; order?: number; dreGroup?: DreGroup; excludeFromDashboard?: boolean }>>>
   costCenters: Array<{ label: string; costType: CostType }>
   customFields?: Partial<Record<EntryKind, Array<{ fieldKey: string; label: string; dataType: FieldType; required?: boolean; order?: number }>>>
 }
@@ -32,9 +32,19 @@ export async function applyTemplate(
 
   // Catálogos (SERVICE/STATUS/PAYMENT_METHOD/CATEGORY) — idempotente por (companyId, kind, label).
   const catalogRows = (
-    Object.entries(template.catalogs) as Array<[CatalogKind, Array<{ label: string; order?: number; dreGroup?: DreGroup }>]>
+    Object.entries(template.catalogs) as Array<
+      [CatalogKind, Array<{ label: string; order?: number; dreGroup?: DreGroup; excludeFromDashboard?: boolean }>]
+    >
   ).flatMap(([kind, values]) =>
-    values.map((v) => ({ tenantId, companyId, kind, label: v.label, order: v.order ?? 0, dreGroup: v.dreGroup ?? null })),
+    values.map((v) => ({
+      tenantId,
+      companyId,
+      kind,
+      label: v.label,
+      order: v.order ?? 0,
+      dreGroup: v.dreGroup ?? null,
+      excludeFromDashboard: v.excludeFromDashboard ?? false,
+    })),
   )
   if (catalogRows.length) {
     const kinds = [...new Set(catalogRows.map((r) => r.kind))]

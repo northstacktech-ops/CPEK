@@ -35,8 +35,6 @@ export default defineEventHandler(async (event) => {
 
   try {
     return await withTenant(auth.tenantId, async (tx) => {
-      const today = new Date()
-
       // Status marcado como "não conta no Dashboard" (ex.: Consolidado) — o
       // lançamento some de toda conta aqui, aparecendo só somado no DRE.
       const excludedStatuses = await tx.catalogValue.findMany({
@@ -46,17 +44,18 @@ export default defineEventHandler(async (event) => {
       const excludedStatusIds = excludedStatuses.map((s) => s.id)
       const statusFilter = excludedStatusIds.length ? { statusId: { notIn: excludedStatusIds } } : {}
 
-      // Vencidos nunca depende do período selecionado no dashboard — soma TODOS os
-      // pendentes vencidos da empresa (qualquer mês), não só o mês em exibição.
+      // Vencidos = tudo que está em aberto (não pago), sem nenhuma restrição de
+      // data de vencimento ou de período — soma qualquer pendência da empresa,
+      // criada em qualquer mês, vencendo no passado, hoje ou daqui a meses.
       const [period, vencidosExits, vencidosClosings] = await Promise.all([
         tx.period.findUnique({
           where: { companyId_year_month: { companyId: query.companyId, year, month } },
         }),
         tx.exit.findMany({
-          where: { companyId: query.companyId, dataVencimento: { lt: today }, dataPagamento: null, ...statusFilter },
+          where: { companyId: query.companyId, dataPagamento: null, ...statusFilter },
         }),
         tx.closing.findMany({
-          where: { companyId: query.companyId, dataVencPrev: { lt: today }, dataRecebimento: null, ...statusFilter },
+          where: { companyId: query.companyId, dataRecebimento: null, ...statusFilter },
         }),
       ])
       const vencidos =

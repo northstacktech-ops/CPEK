@@ -5,7 +5,6 @@ import PageHeader from '../../components/layout/PageHeader.vue'
 import PageContent from '../../components/layout/PageContent.vue'
 import CustomFieldsFields from '../../components/lancamentos/CustomFieldsFields.vue'
 import { useCompanyStore } from '../../stores/company'
-import { usePeriodStore } from '../../stores/period'
 
 interface NamedOption {
   id: string
@@ -65,9 +64,7 @@ interface ExitRow {
 }
 
 const company = useCompanyStore()
-const period = usePeriodStore()
 const { api } = useApi()
-const { ensure } = usePeriod()
 
 const loading = ref(false)
 const saving = ref(false)
@@ -207,8 +204,7 @@ async function loadExits() {
   error.value = null
 
   try {
-    const [currentPeriod, categoryRes, supplierRes, costCenterRes, paymentRes, statusRes, customFieldRes] = await Promise.all([
-      ensure(company.activeId),
+    const [categoryRes, supplierRes, costCenterRes, paymentRes, statusRes, customFieldRes] = await Promise.all([
       api<{ items: NamedOption[] }>('/api/catalogs', { query: { companyId: company.activeId, kind: 'CATEGORY', includeInactive: true } }),
       api<{ items: NamedOption[] }>('/api/contacts', { query: { companyId: company.activeId, type: 'SUPPLIER', includeInactive: true } }),
       api<{ items: NamedOption[] }>('/api/cost-centers', { query: { companyId: company.activeId, includeInactive: true } }),
@@ -226,7 +222,7 @@ async function loadExits() {
     if (!displayField.value && customFieldDefs.value.length) displayField.value = customFieldDefs.value[0].fieldKey
 
     const response = await api<{ items: ExitRecord[] }>('/api/exits', {
-      query: { companyId: company.activeId, periodId: currentPeriod.id },
+      query: { companyId: company.activeId },
     })
     exits.value = response.items.map(normalizeExit)
   } catch (err) {
@@ -292,7 +288,6 @@ async function save() {
   error.value = null
 
   try {
-    const currentPeriod = await ensure(company.activeId)
     const jaPago = form.value.jaPago || form.value.status === 'Pago'
     const paidDate = jaPago ? (form.value.dataPagamento ?? new Date()) : null
     const body = {
@@ -317,7 +312,7 @@ async function save() {
       ? await api<{ item: ExitRecord }>(`/api/exits/${editingId.value}`, { method: 'PATCH', body })
       : await api<{ item: ExitRecord }>('/api/exits', {
           method: 'POST',
-          body: { ...body, companyId: company.activeId, periodId: currentPeriod.id },
+          body: { ...body, companyId: company.activeId },
         })
 
     const displayRecord: ExitRecord = {
@@ -400,10 +395,6 @@ function exportCSV() {
 }
 
 watch(() => company.activeId, () => {
-  void loadExits()
-})
-
-watch(() => [period.month, period.year], () => {
   void loadExits()
 })
 
@@ -500,7 +491,7 @@ onMounted(() => {
           <template #empty>
             <div class="flex flex-col items-center py-10 text-center">
               <i class="pi pi-inbox mb-3 text-3xl text-surface-300" />
-              <p class="text-sm font-medium text-surface-500">Nenhuma saída neste período</p>
+              <p class="text-sm font-medium text-surface-500">Nenhuma saída encontrada</p>
               <p class="mt-1 text-xs text-surface-400">Clique em "Nova saída" para registrar.</p>
             </div>
           </template>

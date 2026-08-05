@@ -5,7 +5,6 @@ import PageHeader from '../../components/layout/PageHeader.vue'
 import PageContent from '../../components/layout/PageContent.vue'
 import CustomFieldsFields from '../../components/lancamentos/CustomFieldsFields.vue'
 import { useCompanyStore } from '../../stores/company'
-import { usePeriodStore } from '../../stores/period'
 
 interface CatalogOption {
   id: string
@@ -73,9 +72,7 @@ interface EntryRow {
 }
 
 const company = useCompanyStore()
-const period = usePeriodStore()
 const { api } = useApi()
-const { ensure } = usePeriod()
 
 const loading = ref(false)
 const saving = ref(false)
@@ -227,8 +224,7 @@ async function loadEntries() {
   error.value = null
 
   try {
-    const [currentPeriod, serviceRes, categoryRes, statusRes, paymentRes, clientRes, customFieldRes] = await Promise.all([
-      ensure(company.activeId),
+    const [serviceRes, categoryRes, statusRes, paymentRes, clientRes, customFieldRes] = await Promise.all([
       api<{ items: CatalogOption[] }>('/api/catalogs', { query: { companyId: company.activeId, kind: 'SERVICE', includeInactive: true } }),
       api<{ items: CatalogOption[] }>('/api/catalogs', { query: { companyId: company.activeId, kind: 'CATEGORY', includeInactive: true } }),
       api<{ items: CatalogOption[] }>('/api/catalogs', { query: { companyId: company.activeId, kind: 'STATUS', includeInactive: true } }),
@@ -245,7 +241,7 @@ async function loadEntries() {
     customFieldDefs.value = customFieldRes.items.filter((f) => f.active !== false)
 
     const response = await api<{ items: EntryRecord[] }>('/api/entries', {
-      query: { companyId: company.activeId, periodId: currentPeriod.id },
+      query: { companyId: company.activeId },
     })
     entries.value = response.items.map(normalizeEntry)
   } catch (err) {
@@ -321,7 +317,6 @@ async function saveEntry() {
   error.value = null
 
   try {
-    const currentPeriod = await ensure(company.activeId)
     const jaRecebido = form.value.jaRecebido || form.value.status === 'Pago'
     const receivedDate = jaRecebido ? (form.value.dataRecebimento ?? new Date()) : null
     const body = {
@@ -350,7 +345,7 @@ async function saveEntry() {
       ? await api<{ item: EntryRecord }>(`/api/entries/${editingId.value}`, { method: 'PATCH', body })
       : await api<{ item: EntryRecord }>('/api/entries', {
           method: 'POST',
-          body: { ...body, companyId: company.activeId, periodId: currentPeriod.id },
+          body: { ...body, companyId: company.activeId },
         })
 
     const displayRecord: EntryRecord = {
@@ -442,10 +437,6 @@ watch(() => form.value.placa, (value) => {
 })
 
 watch(() => company.activeId, () => {
-  void loadEntries()
-})
-
-watch(() => [period.month, period.year], () => {
   void loadEntries()
 })
 
@@ -559,7 +550,7 @@ onMounted(() => {
           <template #empty>
             <div class="flex flex-col items-center py-10 text-center">
               <i class="pi pi-inbox mb-3 text-3xl text-surface-300" />
-              <p class="text-sm font-medium text-surface-500">Nenhuma entrada neste período</p>
+              <p class="text-sm font-medium text-surface-500">Nenhuma entrada encontrada</p>
               <p class="mt-1 text-xs text-surface-400">Clique em "Nova entrada" para registrar.</p>
             </div>
           </template>

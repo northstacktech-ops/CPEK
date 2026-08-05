@@ -5,7 +5,6 @@ import PageHeader from '../../components/layout/PageHeader.vue'
 import PageContent from '../../components/layout/PageContent.vue'
 import CustomFieldsFields from '../../components/lancamentos/CustomFieldsFields.vue'
 import { useCompanyStore } from '../../stores/company'
-import { usePeriodStore } from '../../stores/period'
 
 interface NamedOption {
   id: string
@@ -57,9 +56,7 @@ interface ClosingRow {
 }
 
 const company = useCompanyStore()
-const period = usePeriodStore()
 const { api } = useApi()
-const { ensure } = usePeriod()
 
 const loading = ref(false)
 const saving = ref(false)
@@ -188,8 +185,7 @@ async function loadClosings() {
   error.value = null
 
   try {
-    const [currentPeriod, clientRes, categoryRes, statusRes, customFieldRes] = await Promise.all([
-      ensure(company.activeId),
+    const [clientRes, categoryRes, statusRes, customFieldRes] = await Promise.all([
       api<{ items: NamedOption[] }>('/api/contacts', { query: { companyId: company.activeId, type: 'CLIENT', includeInactive: true } }),
       api<{ items: NamedOption[] }>('/api/catalogs', { query: { companyId: company.activeId, kind: 'CATEGORY', includeInactive: true } }),
       api<{ items: NamedOption[] }>('/api/catalogs', { query: { companyId: company.activeId, kind: 'STATUS', includeInactive: true } }),
@@ -203,7 +199,7 @@ async function loadClosings() {
     if (!displayField.value && customFieldDefs.value.length) displayField.value = customFieldDefs.value[0].fieldKey
 
     const response = await api<{ items: ClosingRecord[] }>('/api/closings', {
-      query: { companyId: company.activeId, periodId: currentPeriod.id },
+      query: { companyId: company.activeId },
     })
     closings.value = response.items.map(normalizeClosing)
   } catch (err) {
@@ -261,7 +257,6 @@ async function save() {
   error.value = null
 
   try {
-    const currentPeriod = await ensure(company.activeId)
     const receivedDate = form.value.status === 'Recebido'
       ? (form.value.recebimento ?? new Date())
       : (form.value.recebimento ?? null)
@@ -284,7 +279,7 @@ async function save() {
       ? await api<{ item: ClosingRecord }>(`/api/closings/${editingId.value}`, { method: 'PATCH', body })
       : await api<{ item: ClosingRecord }>('/api/closings', {
           method: 'POST',
-          body: { ...body, companyId: company.activeId, periodId: currentPeriod.id },
+          body: { ...body, companyId: company.activeId },
         })
 
     const displayRecord: ClosingRecord = {
@@ -362,10 +357,6 @@ function exportCSV() {
 }
 
 watch(() => company.activeId, () => {
-  void loadClosings()
-})
-
-watch(() => [period.month, period.year], () => {
   void loadClosings()
 })
 
@@ -461,7 +452,7 @@ onMounted(() => {
           <template #empty>
             <div class="flex flex-col items-center py-10 text-center">
               <i class="pi pi-file-check mb-3 text-3xl text-surface-300" />
-              <p class="text-sm font-medium text-surface-500">Nenhum fechamento neste período</p>
+              <p class="text-sm font-medium text-surface-500">Nenhum fechamento encontrado</p>
               <p class="mt-1 text-xs text-surface-400">Clique em "Novo fechamento" para registrar.</p>
             </div>
           </template>

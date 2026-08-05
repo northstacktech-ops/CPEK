@@ -5,7 +5,15 @@ import { uuid, money } from './common'
 export const listExitsQuery = z.object({
   companyId: uuid,
   periodId: uuid.optional(),
+  statusId: uuid.optional(),
+  costCenterId: uuid.optional(),
+  // Busca livre (fornecedor, categoria, documento NF, descrição/anotações) — resolvida no servidor.
+  q: z.string().trim().min(1).max(120).optional(),
+  notaFiscal: z.enum(['true', 'false']).optional(),
+  from: z.coerce.date().optional(),
+  to: z.coerce.date().optional(),
   page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(200).default(50),
 })
 
 export const createExitBody = z.object({

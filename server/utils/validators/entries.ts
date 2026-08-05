@@ -5,7 +5,14 @@ import { uuid, money } from './common'
 export const listEntriesQuery = z.object({
   companyId: uuid,
   periodId: uuid.optional(),
+  statusId: uuid.optional(),
+  // Busca livre (cliente, serviço, placa, modelo, documento NF, descrição) — resolvida no servidor.
+  q: z.string().trim().min(1).max(120).optional(),
+  notaFiscal: z.enum(['true', 'false']).optional(),
+  from: z.coerce.date().optional(),
+  to: z.coerce.date().optional(),
   page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(200).default(50),
 })
 
 export const createEntryBody = z.object({

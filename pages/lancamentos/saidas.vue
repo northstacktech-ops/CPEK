@@ -74,8 +74,17 @@ const statusFilter = ref<string | null>(null)
 const centroCustoFilter = ref<string | null>(null)
 const notaFiscalFilter = ref<string | null>(null)
 const notaFiscalOptions = ['Com nota fiscal', 'Sem nota fiscal']
+const dateFrom = ref<Date | null>(null)
+const dateTo = ref<Date | null>(null)
 const drawerOpen = ref(false)
 const editingId = ref<string | null>(null)
+
+// Paginação real, resolvida no servidor — busca/status/centro de custo/nota
+// fiscal/data também vão pro servidor, senão a paginação escondia lançamentos
+// de novo (só a página carregada era vasculhada).
+const page = ref(1)
+const pageSize = 50
+const total = ref(0)
 
 const exits = ref<ExitRow[]>([])
 const categories = ref<NamedOption[]>([])
@@ -114,24 +123,6 @@ const statusSeverity: Record<string, string> = { Pago: 'success', 'Em Aberto': '
 
 const displayFieldOptions = computed(() => customFieldDefs.value.map((f) => ({ value: f.fieldKey, label: f.label })))
 const displayFieldLabel = computed(() => displayFieldOptions.value.find((o) => o.value === displayField.value)?.label ?? 'Campo personalizado')
-
-const filtered = computed(() => {
-  let result = exits.value
-  if (statusFilter.value) result = result.filter((exit) => exit.status === statusFilter.value)
-  if (centroCustoFilter.value) result = result.filter((exit) => exit.centroCusto === centroCustoFilter.value)
-  if (notaFiscalFilter.value) {
-    const wantsNf = notaFiscalFilter.value === 'Com nota fiscal'
-    result = result.filter((exit) => Boolean(exit.raw.documentoNf) === wantsNf)
-  }
-  const q = search.value.trim().toLowerCase()
-  if (q) {
-    result = result.filter((exit) => {
-      const nfText = exit.raw.documentoNf ? `com nota fiscal nf ${exit.raw.documentoNf}` : 'sem nota fiscal nf'
-      return `${exit.fornecedor} ${exit.categoria} ${exit.status} ${customColumnValue(exit.raw)} ${nfText}`.toLowerCase().includes(q)
-    })
-  }
-  return result
-})
 
 function labelOf(item: NamedOption) {
   return item.label ?? item.name ?? ''
@@ -198,39 +189,78 @@ function normalizeExit(exit: ExitRecord): ExitRow {
   }
 }
 
+async function loadReferences() {
+  if (!company.activeId) return
+  const [categoryRes, supplierRes, costCenterRes, paymentRes, statusRes, customFieldRes] = await Promise.all([
+    api<{ items: NamedOption[] }>('/api/catalogs', { query: { companyId: company.activeId, kind: 'CATEGORY', includeInactive: true } }),
+    api<{ items: NamedOption[] }>('/api/contacts', { query: { companyId: company.activeId, type: 'SUPPLIER', includeInactive: true } }),
+    api<{ items: NamedOption[] }>('/api/cost-centers', { query: { companyId: company.activeId, includeInactive: true } }),
+    api<{ items: NamedOption[] }>('/api/catalogs', { query: { companyId: company.activeId, kind: 'PAYMENT_METHOD', includeInactive: true } }),
+    api<{ items: NamedOption[] }>('/api/catalogs', { query: { companyId: company.activeId, kind: 'STATUS', includeInactive: true } }),
+    api<{ items: CustomFieldOption[] }>('/api/custom-fields', { query: { companyId: company.activeId, kind: 'EXIT', includeInactive: true } }),
+  ])
+
+  categories.value = categoryRes.items
+  suppliers.value = supplierRes.items
+  costCenters.value = costCenterRes.items
+  payments.value = paymentRes.items
+  statuses.value = statusRes.items
+  customFieldDefs.value = customFieldRes.items.filter((f) => f.active !== false)
+  if (!displayField.value && customFieldDefs.value.length) displayField.value = customFieldDefs.value[0].fieldKey
+}
+
+function endOfDay(date: Date) {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59, 999)
+}
+
 async function loadExits() {
   if (!company.activeId) return
   loading.value = true
   error.value = null
 
   try {
-    const [categoryRes, supplierRes, costCenterRes, paymentRes, statusRes, customFieldRes] = await Promise.all([
-      api<{ items: NamedOption[] }>('/api/catalogs', { query: { companyId: company.activeId, kind: 'CATEGORY', includeInactive: true } }),
-      api<{ items: NamedOption[] }>('/api/contacts', { query: { companyId: company.activeId, type: 'SUPPLIER', includeInactive: true } }),
-      api<{ items: NamedOption[] }>('/api/cost-centers', { query: { companyId: company.activeId, includeInactive: true } }),
-      api<{ items: NamedOption[] }>('/api/catalogs', { query: { companyId: company.activeId, kind: 'PAYMENT_METHOD', includeInactive: true } }),
-      api<{ items: NamedOption[] }>('/api/catalogs', { query: { companyId: company.activeId, kind: 'STATUS', includeInactive: true } }),
-      api<{ items: CustomFieldOption[] }>('/api/custom-fields', { query: { companyId: company.activeId, kind: 'EXIT', includeInactive: true } }),
-    ])
-
-    categories.value = categoryRes.items
-    suppliers.value = supplierRes.items
-    costCenters.value = costCenterRes.items
-    payments.value = paymentRes.items
-    statuses.value = statusRes.items
-    customFieldDefs.value = customFieldRes.items.filter((f) => f.active !== false)
-    if (!displayField.value && customFieldDefs.value.length) displayField.value = customFieldDefs.value[0].fieldKey
-
-    const response = await api<{ items: ExitRecord[] }>('/api/exits', {
-      query: { companyId: company.activeId },
+    const statusId = optionIdByLabel(statuses.value, statusFilter.value)
+    const costCenterId = optionIdByLabel(costCenters.value, centroCustoFilter.value)
+    const response = await api<{ items: ExitRecord[]; total: number }>('/api/exits', {
+      query: {
+        companyId: company.activeId,
+        page: page.value,
+        pageSize,
+        ...(search.value.trim() ? { q: search.value.trim() } : {}),
+        ...(statusId ? { statusId } : {}),
+        ...(costCenterId ? { costCenterId } : {}),
+        ...(notaFiscalFilter.value ? { notaFiscal: notaFiscalFilter.value === 'Com nota fiscal' ? 'true' : 'false' } : {}),
+        ...(dateFrom.value ? { from: dateFrom.value.toISOString() } : {}),
+        ...(dateTo.value ? { to: endOfDay(dateTo.value).toISOString() } : {}),
+      },
     })
     exits.value = response.items.map(normalizeExit)
+    total.value = response.total
   } catch (err) {
     error.value = apiErrorMessage(err, 'Não foi possível carregar as saídas.')
   } finally {
     loading.value = false
   }
 }
+
+function onPage(event: { page: number }) {
+  page.value = event.page + 1
+  void loadExits()
+}
+
+let searchDebounce: ReturnType<typeof setTimeout> | undefined
+watch(search, () => {
+  if (searchDebounce) clearTimeout(searchDebounce)
+  searchDebounce = setTimeout(() => {
+    page.value = 1
+    void loadExits()
+  }, 400)
+})
+
+watch([statusFilter, centroCustoFilter, notaFiscalFilter, dateFrom, dateTo], () => {
+  page.value = 1
+  void loadExits()
+})
 
 function resetForm() {
   form.value = {
@@ -359,7 +389,7 @@ function exportCSV() {
     ...customFieldDefs.value.map((f) => f.label),
   ]
   const rows: string[][] = [headers]
-  filtered.value.forEach((exit) => {
+  exits.value.forEach((exit) => {
     const raw = exit.raw
     const snapshot = Array.isArray(raw.customSnapshot) ? (raw.customSnapshot as CustomSnapshotItem[]) : []
     const customValues = customFieldDefs.value.map((f) => {
@@ -395,10 +425,13 @@ function exportCSV() {
 }
 
 watch(() => company.activeId, () => {
+  page.value = 1
+  void loadReferences()
   void loadExits()
 })
 
 onMounted(() => {
+  void loadReferences()
   void loadExits()
 })
 </script>
@@ -433,6 +466,8 @@ onMounted(() => {
           <Select v-model="centroCustoFilter" :options="centroCustoOptions" placeholder="C. Custo" show-clear size="small" class="w-full md:w-40" />
           <Select v-model="statusFilter" :options="statusOptions" placeholder="Status" show-clear size="small" class="w-full md:w-40" />
           <Select v-model="notaFiscalFilter" :options="notaFiscalOptions" placeholder="Nota fiscal" show-clear size="small" class="w-full md:w-44" />
+          <DatePicker v-model="dateFrom" placeholder="De" date-format="dd/mm/yy" show-icon show-clear size="small" class="w-full md:w-36" />
+          <DatePicker v-model="dateTo" placeholder="Até" date-format="dd/mm/yy" show-icon show-clear size="small" class="w-full md:w-36" />
           <Select
             v-model="displayField"
             :options="displayFieldOptions"
@@ -446,19 +481,31 @@ onMounted(() => {
 
         <UiTableSkeleton v-if="loading" :rows="6" :columns="8" />
 
-        <DataTable v-else :value="filtered" data-key="id" paginator :rows="8" size="small" class="cpek-table">
-          <Column field="data" header="Data" sortable style="width:9rem" />
-          <Column field="fornecedor" header="Fornecedor" sortable />
-          <Column field="categoria" header="Categoria" sortable style="width:13rem">
+        <DataTable
+          v-else
+          :value="exits"
+          data-key="id"
+          lazy
+          paginator
+          :rows="pageSize"
+          :total-records="total"
+          :first="(page - 1) * pageSize"
+          size="small"
+          class="cpek-table"
+          @page="onPage"
+        >
+          <Column field="data" header="Data" style="width:9rem" />
+          <Column field="fornecedor" header="Fornecedor" />
+          <Column field="categoria" header="Categoria" style="width:13rem">
             <template #body="{ data }"><Tag :value="data.categoria" severity="secondary" /></template>
           </Column>
-          <Column field="centroCusto" header="C. Custo" sortable style="width:8rem">
+          <Column field="centroCusto" header="C. Custo" style="width:8rem">
             <template #body="{ data }"><span class="text-sm text-surface-500">{{ data.centroCusto }}</span></template>
           </Column>
-          <Column field="valor" header="Valor" sortable style="width:9rem">
+          <Column field="valor" header="Valor" style="width:9rem">
             <template #body="{ data }"><span class="font-semibold tabular-nums text-red-600">{{ brl(data.valor) }}</span></template>
           </Column>
-          <Column field="vencimento" header="Vencimento" sortable style="width:9rem" />
+          <Column field="vencimento" header="Vencimento" style="width:9rem" />
           <Column header="Nota Fiscal" style="width:9rem">
             <template #body="{ data }">
               <div class="flex flex-col gap-0.5">
@@ -477,7 +524,7 @@ onMounted(() => {
               <span class="text-sm text-surface-600 dark:text-surface-300">{{ customColumnValue(data.raw) }}</span>
             </template>
           </Column>
-          <Column field="status" header="Status" sortable style="width:9rem">
+          <Column field="status" header="Status" style="width:9rem">
             <template #body="{ data }"><Tag :value="data.status" :severity="statusSeverity[data.status] ?? 'secondary'" /></template>
           </Column>
           <Column header="" style="width:5rem" body-class="text-right">

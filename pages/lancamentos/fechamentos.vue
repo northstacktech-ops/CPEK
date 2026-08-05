@@ -65,8 +65,17 @@ const search = ref('')
 const statusFilter = ref<string | null>(null)
 const notaFiscalFilter = ref<string | null>(null)
 const notaFiscalOptions = ['Com nota fiscal', 'Sem nota fiscal']
+const dateFrom = ref<Date | null>(null)
+const dateTo = ref<Date | null>(null)
 const drawerOpen = ref(false)
 const editingId = ref<string | null>(null)
+
+// Paginação real, resolvida no servidor — busca/status/nota fiscal/data também
+// vão pro servidor, senão a paginação escondia lançamentos de novo (só a
+// página carregada era vasculhada).
+const page = ref(1)
+const pageSize = 50
+const total = ref(0)
 
 const closings = ref<ClosingRow[]>([])
 const clients = ref<NamedOption[]>([])
@@ -97,23 +106,6 @@ const statusSeverity: Record<string, string> = { Recebido: 'success', Pago: 'suc
 
 const displayFieldOptions = computed(() => customFieldDefs.value.map((f) => ({ value: f.fieldKey, label: f.label })))
 const displayFieldLabel = computed(() => displayFieldOptions.value.find((o) => o.value === displayField.value)?.label ?? 'Campo personalizado')
-
-const filtered = computed(() => {
-  let result = closings.value
-  if (statusFilter.value) result = result.filter((closing) => closing.status === statusFilter.value)
-  if (notaFiscalFilter.value) {
-    const wantsNf = notaFiscalFilter.value === 'Com nota fiscal'
-    result = result.filter((closing) => Boolean(closing.raw.documentoNf) === wantsNf)
-  }
-  const q = search.value.trim().toLowerCase()
-  if (q) {
-    result = result.filter((closing) => {
-      const nfText = closing.raw.documentoNf ? `com nota fiscal nf ${closing.raw.documentoNf}` : 'sem nota fiscal nf'
-      return `${closing.cliente} ${closing.status} ${customColumnValue(closing.raw)} ${nfText}`.toLowerCase().includes(q)
-    })
-  }
-  return result
-})
 
 function labelOf(item: NamedOption) {
   return item.label ?? item.name ?? ''
@@ -179,35 +171,72 @@ function normalizeClosing(closing: ClosingRecord): ClosingRow {
   }
 }
 
+async function loadReferences() {
+  if (!company.activeId) return
+  const [clientRes, categoryRes, statusRes, customFieldRes] = await Promise.all([
+    api<{ items: NamedOption[] }>('/api/contacts', { query: { companyId: company.activeId, type: 'CLIENT', includeInactive: true } }),
+    api<{ items: NamedOption[] }>('/api/catalogs', { query: { companyId: company.activeId, kind: 'CATEGORY', includeInactive: true } }),
+    api<{ items: NamedOption[] }>('/api/catalogs', { query: { companyId: company.activeId, kind: 'STATUS', includeInactive: true } }),
+    api<{ items: CustomFieldOption[] }>('/api/custom-fields', { query: { companyId: company.activeId, kind: 'CLOSING', includeInactive: true } }),
+  ])
+
+  clients.value = clientRes.items
+  categories.value = categoryRes.items
+  statuses.value = statusRes.items
+  customFieldDefs.value = customFieldRes.items.filter((f) => f.active !== false)
+  if (!displayField.value && customFieldDefs.value.length) displayField.value = customFieldDefs.value[0].fieldKey
+}
+
+function endOfDay(date: Date) {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59, 999)
+}
+
 async function loadClosings() {
   if (!company.activeId) return
   loading.value = true
   error.value = null
 
   try {
-    const [clientRes, categoryRes, statusRes, customFieldRes] = await Promise.all([
-      api<{ items: NamedOption[] }>('/api/contacts', { query: { companyId: company.activeId, type: 'CLIENT', includeInactive: true } }),
-      api<{ items: NamedOption[] }>('/api/catalogs', { query: { companyId: company.activeId, kind: 'CATEGORY', includeInactive: true } }),
-      api<{ items: NamedOption[] }>('/api/catalogs', { query: { companyId: company.activeId, kind: 'STATUS', includeInactive: true } }),
-      api<{ items: CustomFieldOption[] }>('/api/custom-fields', { query: { companyId: company.activeId, kind: 'CLOSING', includeInactive: true } }),
-    ])
-
-    clients.value = clientRes.items
-    categories.value = categoryRes.items
-    statuses.value = statusRes.items
-    customFieldDefs.value = customFieldRes.items.filter((f) => f.active !== false)
-    if (!displayField.value && customFieldDefs.value.length) displayField.value = customFieldDefs.value[0].fieldKey
-
-    const response = await api<{ items: ClosingRecord[] }>('/api/closings', {
-      query: { companyId: company.activeId },
+    const statusId = optionIdByLabel(statuses.value, statusFilter.value)
+    const response = await api<{ items: ClosingRecord[]; total: number }>('/api/closings', {
+      query: {
+        companyId: company.activeId,
+        page: page.value,
+        pageSize,
+        ...(search.value.trim() ? { q: search.value.trim() } : {}),
+        ...(statusId ? { statusId } : {}),
+        ...(notaFiscalFilter.value ? { notaFiscal: notaFiscalFilter.value === 'Com nota fiscal' ? 'true' : 'false' } : {}),
+        ...(dateFrom.value ? { from: dateFrom.value.toISOString() } : {}),
+        ...(dateTo.value ? { to: endOfDay(dateTo.value).toISOString() } : {}),
+      },
     })
     closings.value = response.items.map(normalizeClosing)
+    total.value = response.total
   } catch (err) {
     error.value = apiErrorMessage(err, 'Não foi possível carregar os fechamentos.')
   } finally {
     loading.value = false
   }
 }
+
+function onPage(event: { page: number }) {
+  page.value = event.page + 1
+  void loadClosings()
+}
+
+let searchDebounce: ReturnType<typeof setTimeout> | undefined
+watch(search, () => {
+  if (searchDebounce) clearTimeout(searchDebounce)
+  searchDebounce = setTimeout(() => {
+    page.value = 1
+    void loadClosings()
+  }, 400)
+})
+
+watch([statusFilter, notaFiscalFilter, dateFrom, dateTo], () => {
+  page.value = 1
+  void loadClosings()
+})
 
 function resetForm() {
   form.value = {
@@ -324,7 +353,7 @@ function exportCSV() {
     ...customFieldDefs.value.map((f) => f.label),
   ]
   const rows: string[][] = [headers]
-  filtered.value.forEach((closing) => {
+  closings.value.forEach((closing) => {
     const raw = closing.raw
     const snapshot = Array.isArray(raw.customSnapshot) ? (raw.customSnapshot as CustomSnapshotItem[]) : []
     const customValues = customFieldDefs.value.map((f) => {
@@ -357,10 +386,13 @@ function exportCSV() {
 }
 
 watch(() => company.activeId, () => {
+  page.value = 1
+  void loadReferences()
   void loadClosings()
 })
 
 onMounted(() => {
+  void loadReferences()
   void loadClosings()
 })
 </script>
@@ -394,6 +426,8 @@ onMounted(() => {
           </IconField>
           <Select v-model="statusFilter" :options="statusOptions" placeholder="Status" show-clear size="small" class="w-full md:w-40" />
           <Select v-model="notaFiscalFilter" :options="notaFiscalOptions" placeholder="Nota fiscal" show-clear size="small" class="w-full md:w-44" />
+          <DatePicker v-model="dateFrom" placeholder="De" date-format="dd/mm/yy" show-icon show-clear size="small" class="w-full md:w-36" />
+          <DatePicker v-model="dateTo" placeholder="Até" date-format="dd/mm/yy" show-icon show-clear size="small" class="w-full md:w-36" />
           <Select
             v-model="displayField"
             :options="displayFieldOptions"
@@ -407,13 +441,25 @@ onMounted(() => {
 
         <UiTableSkeleton v-if="loading" :rows="6" :columns="7" />
 
-        <DataTable v-else :value="filtered" data-key="id" paginator :rows="8" size="small" class="cpek-table">
-          <Column field="cliente" header="Cliente" sortable />
-          <Column field="valor" header="Valor" sortable style="width:10rem">
+        <DataTable
+          v-else
+          :value="closings"
+          data-key="id"
+          lazy
+          paginator
+          :rows="pageSize"
+          :total-records="total"
+          :first="(page - 1) * pageSize"
+          size="small"
+          class="cpek-table"
+          @page="onPage"
+        >
+          <Column field="cliente" header="Cliente" />
+          <Column field="valor" header="Valor" style="width:10rem">
             <template #body="{ data }"><span class="font-semibold tabular-nums">{{ brl(data.valor) }}</span></template>
           </Column>
-          <Column field="vencimento" header="Vencimento previsto" sortable style="width:12rem" />
-          <Column field="recebimento" header="Data recebimento" sortable style="width:12rem">
+          <Column field="vencimento" header="Vencimento previsto" style="width:12rem" />
+          <Column field="recebimento" header="Data recebimento" style="width:12rem">
             <template #body="{ data }">
               <span :class="data.recebimento ? 'text-surface-700 dark:text-surface-200' : 'text-surface-400'">
                 {{ data.recebimento || '-' }}
@@ -438,7 +484,7 @@ onMounted(() => {
               <span class="text-sm text-surface-600 dark:text-surface-300">{{ customColumnValue(data.raw) }}</span>
             </template>
           </Column>
-          <Column field="status" header="Status" sortable style="width:9rem">
+          <Column field="status" header="Status" style="width:9rem">
             <template #body="{ data }"><Tag :value="data.status" :severity="statusSeverity[data.status] ?? 'secondary'" /></template>
           </Column>
           <Column header="" style="width:5rem" body-class="text-right">
